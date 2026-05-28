@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro Elettronico CyberDark Pro</title>
+    <title>Registro Elettronico CyberDark Cloud</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+
     <style>
         :root {
             --bg-black: #000000;
@@ -16,34 +20,35 @@
             --accent-purple: #a855f7;
             --accent-cyan: #06b6d4;
             
-            --voto-suff: #4ade80; /* Verde */
-            --voto-insuff: #f87171; /* Rosso */
+            --voto-suff: #4ade80;
+            --voto-insuff: #f87171;
 
-            --c-presente: rgba(16, 185, 129, 0.15);
-            --t-presente: #4ade80;
-            --c-assente: rgba(239, 68, 68, 0.15);
-            --t-assente: #f87171;
-            
-            /* Colori Richiesti */
-            --c-ritardo: rgba(249, 115, 22, 0.15); /* Sfondo Arancione */
-            --t-ritardo: #f97316;                  /* Testo Arancione */
-            --c-uscito: rgba(59, 130, 246, 0.15);   /* Sfondo Blu */
-            --t-uscito: #3b82f6;                   /* Testo Blu */
+            --c-presente: rgba(16, 185, 129, 0.15); --t-presente: #4ade80;
+            --c-assente: rgba(239, 68, 68, 0.15); --t-assente: #f87171;
+            --c-ritardo: rgba(249, 115, 22, 0.15); --t-ritardo: #f97316;
+            --c-uscito: rgba(59, 130, 246, 0.15); --t-uscito: #3b82f6;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
 
         body { display: flex; height: 100vh; background-color: var(--bg-black); color: var(--text-light); overflow: hidden; }
 
-        /* Sidebar */
-        .sidebar { width: 260px; background-color: var(--bg-sidebar); padding: 25px 15px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        /* Pulsante Menu a tendina */
+        #btn-toggle-menu { position: absolute; top: 15px; left: 15px; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border-color); color: white; padding: 10px 14px; font-size: 18px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        #btn-toggle-menu:hover { border-color: var(--accent-cyan); }
+
+        /* Sidebar con animazione rientro */
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); padding: 70px 15px 25px 15px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); overflow-y: auto; transition: transform 0.3s ease; position: absolute; height: 100%; z-index: 900; }
+        .sidebar.nascosta { transform: translateX(-100%); }
         .sidebar h2 { margin-bottom: 20px; font-size: 20px; text-align: center; color: var(--accent-purple); font-weight: 800; }
         .nav-btn { background: none; border: none; color: var(--text-muted); padding: 12px 15px; text-align: left; font-size: 14px; cursor: pointer; border-radius: 8px; margin-bottom: 5px; transition: all 0.2s ease; display: flex; align-items: center; gap: 10px; width: 100%; font-weight: 600; }
         .nav-btn:hover { background-color: #18181b; color: var(--text-light); }
         .nav-btn.active { background-color: var(--accent-purple); color: white; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4); }
 
         /* Contenuto */
-        .main-content { flex: 1; padding: 40px; overflow-y: auto; }
+        .main-content { flex: 1; padding: 70px 40px 40px 40px; overflow-y: auto; transition: margin-left 0.3s ease; margin-left: 260px; }
+        .main-content.allargato { margin-left: 0; }
+        
         .page { display: none; }
         .page.active { display: block; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -61,25 +66,20 @@
         .btn-cestino { background: transparent; border: none; font-size: 16px; cursor: pointer; padding: 5px; }
         .btn-cestino:hover { transform: scale(1.2); }
 
-        /* Tabelle */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
         th { background-color: #18181b; color: var(--text-muted); font-size: 13px; text-transform: uppercase; }
 
         .clickable-name { color: var(--accent-cyan); cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
-        .clickable-name:hover { color: #22d3ee; }
         .name-danger { color: #f87171 !important; }
 
-        /* Classi Appello */
         .row-Presente { background-color: var(--c-presente); border-left: 4px solid var(--t-presente); }
         .row-Assente { background-color: var(--c-assente); border-left: 4px solid var(--t-assente); }
         .row-Ritardo { background-color: var(--c-ritardo); border-left: 4px solid var(--t-ritardo); }
         .row-Uscito { background-color: var(--c-uscito); border-left: 4px solid var(--t-uscito); }
         select.select-stato { background-color: #18181b; border: 1px solid rgba(255,255,255,0.1); color: inherit; width: auto; margin: 0; font-weight: bold; }
 
-        /* Voti e Pagelle */
         .voto-item { display: inline-block; margin-right: 6px; font-weight: bold; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
-        .voto-item:hover { background: rgba(255,255,255,0.1); }
         .voto-verde { color: var(--voto-suff); }
         .voto-rosso { color: var(--voto-insuff); }
 
@@ -87,24 +87,25 @@
         .card-materia { background: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .card-materia:hover { border-color: var(--accent-cyan); background: #18181b; }
 
-        /* Layout Dashboard */
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .dash-box { background: #18181b; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); }
         .dash-box h4 { color: var(--accent-purple); margin-bottom: 10px; font-size: 15px; }
 
-        /* Modal */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; width: 500px; max-height: 85vh; overflow-y: auto; position: relative; }
         .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; color: var(--text-muted); cursor: pointer; }
         
-        .pagella-materia-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #262626; }
-        .pagella-input-voto { width: 70px; margin: 0; text-align: center; font-weight: bold; }
+        /* Box Stato Sincronizzazione */
+        #sync-status { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+        .status-ok { color: #10b981 !important; }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <button id="btn-toggle-menu" onclick="toggleSidebar()">☰ Menu</button>
+
+    <div class="sidebar" id="sidebar">
         <h2>CYBERDARK</h2>
         <button id="btn-dashboard" class="nav-btn active" onclick="cambiaPagina('dashboard', this)">🏠 Dashboard</button>
         <button id="btn-presenze" class="nav-btn" onclick="cambiaPagina('presenze', this)">📅 Appello</button>
@@ -118,10 +119,10 @@
         <button id="btn-pagelle" class="nav-btn" onclick="cambiaPagina('pagelle', this)">📁 Archivio Pagelle</button>
         <div style="margin: auto 0 10px 0;"></div>
         <button id="btn-config" class="nav-btn" onclick="cambiaPagina('config', this)">⚙️ Impostazioni</button>
+        <div id="sync-status">Connessione... ⏳</div>
     </div>
 
-    <div class="main-content">
-
+    <div class="main-content" id="main-content">
         <div id="page-dashboard" class="page active">
             <h1>Riepilogo di Oggi</h1>
             <div class="dash-grid">
@@ -218,7 +219,7 @@
         <div id="page-comunicazioni" class="page">
             <h1>Comunicazioni alle Famiglie</h1>
             <div class="card">
-                <input type="text" id="comTitolo" placeholder="Titolo Comunicazione (es. Sciopero, Uscita Anticipata)">
+                <input type="text" id="comTitolo" placeholder="Titolo (es. Sciopero, Uscita Anticipata)">
                 <input type="date" id="comData" style="max-width: 220px;">
                 <textarea id="comTesto" rows="3" placeholder="Testo della comunicazione..."></textarea>
                 <button class="btn" onclick="salvaComunicazione()">Pubblica</button>
@@ -231,7 +232,7 @@
         <div id="page-crea-pagella" class="page">
             <h1>Compilazione Nuova Pagella</h1>
             <div class="card" style="border-color: var(--accent-purple);">
-                <p style="color: var(--text-muted); margin-bottom:15px;">Clicca su uno studente per inserire i voti finali per questa sessione. Al termine, genera il documento.</p>
+                <p style="color: var(--text-muted); margin-bottom:15px;">Clicca su uno studente per inserire i voti finali per questa sessione.</p>
                 <div class="grid-materie" id="listaStudentiPagella"></div>
                 <hr style="border-color: #262626; margin: 25px 0;">
                 <button class="btn btn-success" style="width: 100%; font-size: 16px;" onclick="salvaPagellaDefinitiva()">💾 Genera Pagella Definitiva</button>
@@ -259,11 +260,7 @@
 
         <div id="page-config" class="page">
             <h1>Impostazioni</h1>
-            <div class="card">
-                <button class="btn" onclick="esportaBackup()">⬇️ Esporta Backup (.json)</button>
-                <button class="btn btn-success" onclick="document.getElementById('fileImport').click()">⬆️ Importa</button>
-                <input type="file" id="fileImport" style="display: none;" accept=".json" onchange="importaBackup(event)">
-            </div>
+            <p style="color:var(--text-muted); margin-bottom:15px;">⚠️ I tuoi dati ora si salvano in automatico su Google Firebase.</p>
             <div class="card">
                 <input type="text" id="nuovoStud" placeholder="Nome Studente" style="width:auto;"><button class="btn" onclick="aggiungiStudente()">Aggiungi</button>
                 <div id="listaStud" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
@@ -272,7 +269,7 @@
                 <input type="text" id="nuovaMat" placeholder="Materia" style="width:auto;"><button class="btn" onclick="aggiungiMateria()">Aggiungi</button>
                 <div id="listaMat" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
             </div>
-            <button class="btn btn-danger" onclick="resettatutto()">⚠️ Svuota Intero Registro</button>
+            <button class="btn btn-danger" onclick="selezionaReset()">⚠️ Svuota Intero Registro Cloud</button>
         </div>
 
     </div>
@@ -314,99 +311,123 @@
     </div>
 
     <script>
-        // Array degli alunni predefiniti
+        // --- 1. CONFIGURAZIONE FIREBASE CLOUD ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA9-5o_7GQmNosWQAWOI9CVnZxNTGOfld8",
+            authDomain: "registro-9db0e.firebaseapp.com",
+            databaseURL: "https://registro-9db0e-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "registro-9db0e",
+            storageBucket: "registro-9db0e.firebasestorage.app",
+            messagingSenderId: "961301993343",
+            appId: "1:961301993343:web:bf9623c907091ad2146c4a"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Struttura base del Database
         const alunniDefault = ["Alessio", "Alex", "Antonio", "Arianna", "Catia", "Chloe", "Cristofer", "Daniela", "Emma", "Enrico", "Federica", "Ginevra", "Gioele", "Giorgia", "Giosuè", "Giulio", "Giuseppe", "Isabel", "Leonardo", "Lorenzo", "Ludovica", "Luisa", "Maria", "Marilena", "Massimo", "Mattia", "Noemi", "Salvo", "Vito", "Vittoria"];
         
-        let db = { studenti: [], materie: [], presenze: {}, voti: [], attivita: [], compiti: [], note: [], comunicazioni: [], pagelle: [] };
-        
-        // Recupero i dati salvati
-        try { 
-            let local = localStorage.getItem('db_cyberdark_final_v8'); 
-            if(local) db = Object.assign(db, JSON.parse(local)); 
-        } catch(e) { console.error("Errore caricamento database", e); }
-        
-        // Controllo strutture mancanti per retrocompatibilità
-        if(!db.note) db.note = []; 
-        if(!db.comunicazioni) db.comunicazioni = []; 
-        if(!db.pagelle) db.pagelle = [];
-        
-        // Inserimento alunni default
-        alunniDefault.forEach(s => { 
-            if(!db.studenti.includes(s)) db.studenti.push(s); 
-        });
-        db.studenti.sort(); 
-        salvaDB();
-
-        let pagellaTemp = {}; 
-        let idPagellaAperta = null;
+        let db = { studenti: [...alunniDefault], materie: [], presenze: {}, voti: [], attivita: [], compiti: [], note: [], comunicazioni: [], pagelle: [] };
+        let paginaAttiva = 'dashboard';
         let oggiStr = new Date().toISOString().split('T')[0];
 
-        // Inizializzazione pagina
-        window.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('input[type="date"]').forEach(el => el.value = oggiStr);
-            cambiaPagina('dashboard', document.getElementById('btn-dashboard'));
+        // Connessione in tempo reale a Firebase
+        database.ref('registroDati').on('value', (snapshot) => {
+            const datiCloud = snapshot.val();
+            if (datiCloud) {
+                // Sincronizza i dati cloud assicurandosi che nessuna lista sia "vuota/indefinita"
+                db = Object.assign({ studenti: [...alunniDefault], materie: [], presenze: {}, voti: [], attivita: [], compiti: [], note: [], comunicazioni: [], pagelle: [] }, datiCloud);
+            } else {
+                // Se il database è nuovo di zecca, salviamo la lista alunni predefinita
+                salvaDB();
+            }
+            
+            document.getElementById('sync-status').innerText = "✅ Cloud Sincronizzato";
+            document.getElementById('sync-status').classList.add('status-ok');
+            
+            // Aggiorna la schermata in base alla pagina in cui ci troviamo
+            aggiornaSchermataAttiva();
         });
 
-        // Funzione salvataggio
-        function salvaDB() { localStorage.setItem('db_cyberdark_final_v8', JSON.stringify(db)); }
-        
-        // Colori per voti sufficienti e insufficienti
-        function calcolaColore(voto) { return parseFloat(voto) >= 6 ? 'voto-verde' : 'voto-rosso'; }
-
-        // SISTEMA DI NAVIGAZIONE
-        function cambiaPagina(id, btn) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('page-'+id).classList.add('active');
-            if(btn) btn.classList.add('active');
-
-            if(id==='dashboard') caricaDashboard();
-            if(id==='presenze') caricaAppello();
-            if(id==='voti') caricaGrigliaVoti();
-            if(id==='attivita' || id==='compiti') aggiornaSelectMaterie();
-            if(id==='note') caricaNote();
-            if(id==='comunicazioni') caricaComunicazioni();
-            if(id==='crea-pagella') inizializzaCreaPagella();
-            if(id==='pagelle') caricaElencoPagelle();
-            if(id==='config') caricaConfig();
+        // Funzione per inviare i dati a Google Firebase
+        function salvaDB() {
+            document.getElementById('sync-status').innerText = "Caricamento... ⏳";
+            document.getElementById('sync-status').classList.remove('status-ok');
+            database.ref('registroDati').set(db);
         }
 
-        // LOGICA DASHBOARD CON ASSENZE/RITARDI/USCITE A COLORI
+        // --- 2. FUNZIONI MENU LATERALE ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const main = document.getElementById('main-content');
+            sidebar.classList.toggle('nascosta');
+            main.classList.toggle('allargato');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('input[type="date"]').forEach(el => el.value = oggiStr);
+            // Su schermi piccoli nascondi la barra di default
+            if(window.innerWidth < 800) toggleSidebar(); 
+        });
+
+        // --- 3. NAVIGAZIONE E AGGIORNAMENTO SCHERMO ---
+        function cambiaPagina(id, btn) {
+            paginaAttiva = id;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            if(btn) {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            document.getElementById('page-'+id).classList.add('active');
+            aggiornaSchermataAttiva();
+            
+            // Chiudi il menu su telefono dopo aver cliccato
+            if(window.innerWidth < 800) toggleSidebar();
+        }
+
+        function aggiornaSchermataAttiva() {
+            if(paginaAttiva==='dashboard') caricaDashboard();
+            if(paginaAttiva==='presenze') caricaAppello();
+            if(paginaAttiva==='voti') caricaGrigliaVoti();
+            if(paginaAttiva==='attivita' || paginaAttiva==='compiti') aggiornaSelectMaterie();
+            if(paginaAttiva==='note') caricaNote();
+            if(paginaAttiva==='comunicazioni') caricaComunicazioni();
+            if(paginaAttiva==='crea-pagella') inizializzaCreaPagella();
+            if(paginaAttiva==='pagelle') caricaElencoPagelle();
+            if(paginaAttiva==='config') caricaConfig();
+        }
+
+        function calcolaColore(voto) { return parseFloat(voto) >= 6 ? 'voto-verde' : 'voto-rosso'; }
+
+        // --- DASHBOARD ---
         function caricaDashboard() {
             document.getElementById('dash-data-oggi').innerText = oggiStr.split('-').reverse().join('/');
-            
             let htmlStato = [];
             if(db.presenze[oggiStr]) { 
                 for(let s in db.presenze[oggiStr]){ 
                     let stato = db.presenze[oggiStr][s];
-                    if(stato==='Assente') {
-                        htmlStato.push(`<li><span style="color: var(--t-assente); font-weight: bold;">🔴 Assente: ${s}</span></li>`);
-                    } else if(stato==='Uscito') {
-                        htmlStato.push(`<li><span style="color: var(--t-uscito); font-weight: bold;">🔵 Uscito Prima: ${s}</span></li>`);
-                    } else if(stato==='Ritardo') {
-                        htmlStato.push(`<li><span style="color: var(--t-ritardo); font-weight: bold;">🟠 In Ritardo: ${s}</span></li>`);
-                    }
+                    if(stato==='Assente') htmlStato.push(`<li><span style="color: var(--t-assente); font-weight: bold;">🔴 Assente: ${s}</span></li>`);
+                    else if(stato==='Uscito') htmlStato.push(`<li><span style="color: var(--t-uscito); font-weight: bold;">🔵 Uscito Prima: ${s}</span></li>`);
+                    else if(stato==='Ritardo') htmlStato.push(`<li><span style="color: var(--t-ritardo); font-weight: bold;">🟠 In Ritardo: ${s}</span></li>`);
                 } 
             }
             document.getElementById('dash-assenti').innerHTML = htmlStato.length ? htmlStato.join('') : '<li style="color: var(--text-muted);">Tutti presenti in classe.</li>';
 
-            // Compiti nella dashboard
             let compiti = db.compiti.filter(c => c.data === oggiStr);
             document.getElementById('dash-compiti').innerHTML = compiti.length ? compiti.map(c => `<li><b>${c.materia}:</b> ${c.testo}</li>`).join('') : '<li>Nessun compito in scadenza oggi.</li>';
 
-            // Comunicazioni nella dashboard
             let coms = [...db.comunicazioni].sort((a,b)=> new Date(b.data) - new Date(a.data)).slice(0,3);
             document.getElementById('dash-comunicazioni').innerHTML = coms.length ? coms.map(c => `<div style="margin-bottom:10px; border-left:3px solid var(--accent-cyan); padding-left:10px;"><b>${c.data.split('-').reverse().join('/')} - ${c.titolo}</b><br>${c.testo}</div>`).join('') : 'Nessuna comunicazione recente.';
         }
 
-        // APPELLO GIORNALIERO A COLORI
+        // --- APPELLO ---
         function caricaAppello() {
             let d = document.getElementById('dataAppello').value, tbody = document.getElementById('tabellaPresenze'); tbody.innerHTML='';
             if(!db.presenze[d]) db.presenze[d] = {};
             
             db.studenti.forEach(st => {
                 let stato = db.presenze[d][st] || "Presente";
-                
                 let colStato = "var(--text-light)";
                 if(stato==='Assente') colStato = "var(--t-assente)";
                 if(stato==='Ritardo') colStato = "var(--t-ritardo)";
@@ -417,7 +438,7 @@
                 <tr class="row-${stato}" style="color: ${colStato};">
                     <td><b style="color: ${colStato};">${st}</b></td>
                     <td>
-                        <select class="select-stato" style="color: ${colStato};" onchange="db.presenze['${d}']['${st}']=this.value; salvaDB(); caricaAppello(); caricaDashboard();">
+                        <select class="select-stato" style="color: ${colStato};" onchange="impostaPresenza('${d}', '${st}', this.value)">
                             <option value="Presente" ${stato==='Presente'?'selected':''} style="color: var(--t-presente);">Presente</option>
                             <option value="Assente" ${stato==='Assente'?'selected':''} style="color: var(--t-assente);">Assente</option>
                             <option value="Ritardo" ${stato==='Ritardo'?'selected':''} style="color: var(--t-ritardo);">In Ritardo</option>
@@ -427,58 +448,42 @@
                 </tr>`;
             });
         }
+        function impostaPresenza(d, st, val) { db.presenze[d][st] = val; salvaDB(); }
 
-        // VOTI
+        // --- VOTI ---
         function caricaGrigliaVoti() {
             document.getElementById('grigliaMaterieVoti').innerHTML = db.materie.map(m => `<div class="card-materia" onclick="apriMateriaVoti('${m}')">${m}</div>`).join('');
         }
         function apriMateriaVoti(m) {
             window.materiaCorrente = m; document.getElementById('titoloMateriaVoti').innerText = "Voti: " + m;
             let tb = document.getElementById('corpoTabellaVoti'); tb.innerHTML = '';
-            
             db.studenti.forEach(s => {
                 let voti = db.voti.filter(v => v.materia === m && v.studente === s);
-                let htmlVoti = voti.map((v, i) => `<span class="voto-item ${calcolaColore(v.voto)}" onclick="eliminaVoto('${m}','${s}',${i})" title="Data: ${v.data.split('-').reverse().join('/')}\nTipo: ${v.tipo}\nClicca per eliminare">${v.voto}</span>`).join(' ');
-                
+                let htmlVoti = voti.map((v, i) => `<span class="voto-item ${calcolaColore(v.voto)}" onclick="eliminaVoto('${m}','${s}',${i})" title="Elimina Voto">${v.voto}</span>`).join(' ');
                 let media = voti.length ? (voti.reduce((acc, c) => acc + parseFloat(c.voto), 0) / voti.length).toFixed(2) : '-';
                 let colMedia = media !== '-' ? calcolaColore(media) : '';
-                
                 tb.innerHTML += `<tr><td><span class="clickable-name" onclick="apriModalVoto('${s}')">${s}</span></td><td>${htmlVoti||'-'}</td><td class="${colMedia}"><b>${media}</b></td></tr>`;
             });
-            
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('page-dettaglio-voti').classList.add('active');
+            paginaAttiva = 'dettaglio-voti';
         }
-        function apriModalVoto(s) { 
-            window.studCorrente = s; 
-            document.getElementById('modalTitoloStudente').innerText = "Voto per: "+s; 
-            document.getElementById('modalVoto').classList.add('active'); 
-        }
+        function apriModalVoto(s) { window.studCorrente = s; document.getElementById('modalTitoloStudente').innerText = "Voto per: "+s; document.getElementById('modalVoto').classList.add('active'); }
         function chiudiModal(id) { document.getElementById(id).classList.remove('active'); }
         function salvaVotoDalModal() {
             let v = document.getElementById('votoValore').value, d = document.getElementById('votoData').value, t = document.getElementById('votoTipo').value;
-            if(!v) return; 
-            db.voti.push({studente: window.studCorrente, materia: window.materiaCorrente, voto: v, data: d, tipo: t});
-            salvaDB(); 
-            chiudiModal('modalVoto'); 
-            apriMateriaVoti(window.materiaCorrente);
+            if(!v) return; db.voti.push({studente: window.studCorrente, materia: window.materiaCorrente, voto: v, data: d, tipo: t});
+            salvaDB(); chiudiModal('modalVoto');
         }
         function eliminaVoto(m, s, idx) {
-            if(confirm("Vuoi davvero eliminare questo voto?")) {
+            if(confirm("Vuoi eliminare questo voto?")) {
                 let rIdx = -1, count = -1;
-                for(let i=0; i<db.voti.length; i++) { 
-                    if(db.voti[i].materia===m && db.voti[i].studente===s){ 
-                        count++; 
-                        if(count===idx) {rIdx=i; break;} 
-                    } 
-                }
-                if(rIdx>-1) db.voti.splice(rIdx, 1); 
-                salvaDB(); 
-                apriMateriaVoti(m);
+                for(let i=0; i<db.voti.length; i++) { if(db.voti[i].materia===m && db.voti[i].studente===s){ count++; if(count===idx) {rIdx=i; break;} } }
+                if(rIdx>-1) { db.voti.splice(rIdx, 1); salvaDB(); }
             }
         }
 
-        // NOTE
+        // --- NOTE ---
         function caricaNote() {
             document.getElementById('notaStudente').innerHTML = db.studenti.map(s => `<option value="${s}">${s}</option>`).join('');
             let tb = document.getElementById('tabellaNote'); tb.innerHTML = '';
@@ -488,17 +493,13 @@
             });
         }
         function salvaNota() {
-            let s = document.getElementById('notaStudente').value;
-            let t = document.getElementById('notaTesto').value;
-            if(!t) { alert("Inserisci la motivazione!"); return; }
-            db.note.push({studente: s, tipo: document.getElementById('notaTipo').value, data: document.getElementById('notaData').value, testo: t});
-            salvaDB(); 
-            document.getElementById('notaTesto').value=''; 
-            caricaNote();
+            let s = document.getElementById('notaStudente').value, t = document.getElementById('notaTesto').value;
+            if(!t) return; db.note.push({studente: s, tipo: document.getElementById('notaTipo').value, data: document.getElementById('notaData').value, testo: t});
+            salvaDB(); document.getElementById('notaTesto').value='';
         }
-        function eliminaNota(i) { if(confirm("Eliminare la nota?")) { db.note.splice(i,1); salvaDB(); caricaNote(); } }
+        function eliminaNota(i) { if(confirm("Eliminare la nota?")) { db.note.splice(i,1); salvaDB(); } }
 
-        // COMUNICAZIONI
+        // --- COMUNICAZIONI ---
         function caricaComunicazioni() {
             let tb = document.getElementById('tabellaComunicazioni'); tb.innerHTML = '';
             db.comunicazioni.sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((c, i) => {
@@ -506,41 +507,28 @@
             });
         }
         function salvaComunicazione() {
-            let t = document.getElementById('comTitolo').value;
-            let txt = document.getElementById('comTesto').value;
-            if(!t || !txt) { alert("Inserisci Titolo e Testo"); return; }
-            db.comunicazioni.push({titolo: t, data: document.getElementById('comData').value, testo: txt});
-            salvaDB(); 
-            document.getElementById('comTitolo').value=''; 
-            document.getElementById('comTesto').value=''; 
-            caricaComunicazioni(); 
-            caricaDashboard(); // Aggiorna anche la home
+            let t = document.getElementById('comTitolo').value, txt = document.getElementById('comTesto').value;
+            if(!t || !txt) return; db.comunicazioni.push({titolo: t, data: document.getElementById('comData').value, testo: txt});
+            salvaDB(); document.getElementById('comTitolo').value=''; document.getElementById('comTesto').value='';
         }
-        function eliminaCom(i) { if(confirm("Eliminare la comunicazione?")) { db.comunicazioni.splice(i,1); salvaDB(); caricaComunicazioni(); caricaDashboard(); } }
+        function eliminaCom(i) { if(confirm("Eliminare comunicazione?")) { db.comunicazioni.splice(i,1); salvaDB(); } }
 
-        // CREAZIONE E GESTIONE PAGELLE
+        // --- PAGELLE ---
+        let pagellaTemp = {}; 
+        let idPagellaAperta = null;
         function inizializzaCreaPagella() {
             pagellaTemp = {}; 
             document.getElementById('listaStudentiPagella').innerHTML = db.studenti.map(s => `<div class="card-materia" style="padding:15px; font-size:16px;" id="btn-pagella-${s}" onclick="apriCompilaStudente('${s}')">${s}</div>`).join('');
         }
         function apriCompilaStudente(s) {
-            window.studPagella = s;
-            document.getElementById('titoloCompilaStudente').innerText = "Voti Finali: " + s;
+            window.studPagella = s; document.getElementById('titoloCompilaStudente').innerText = "Voti Finali: " + s;
             let form = document.getElementById('formVotiPagella'); form.innerHTML = '';
-            
             if(!pagellaTemp[s]) pagellaTemp[s] = { voti: {}, ammesso: true };
-
             db.materie.forEach(m => {
                 let voti = db.voti.filter(v => v.materia === m && v.studente === s);
                 let mediaRaw = voti.length ? (voti.reduce((acc, c) => acc + parseFloat(c.voto), 0) / voti.length).toFixed(2) : 0;
                 let votoSuggerito = pagellaTemp[s].voti[m] || (mediaRaw > 0 ? Math.round(mediaRaw) : '');
-                
-                form.innerHTML += `
-                    <div class="pagella-materia-row">
-                        <div style="width: 150px; font-weight:bold;">${m}</div>
-                        <div style="color: var(--text-muted); font-size: 13px;">Media Matematica: <span class="${calcolaColore(mediaRaw)}">${mediaRaw || '-'}</span></div>
-                        <div><input type="number" class="pagella-input-voto ${calcolaColore(votoSuggerito)}" id="vfin-${m}" value="${votoSuggerito}" placeholder="Voto" oninput="this.className='pagella-input-voto '+calcolaColore(this.value)"></div>
-                    </div>`;
+                form.innerHTML += `<div class="pagella-materia-row"><div style="width: 150px; font-weight:bold;">${m}</div><div style="color: var(--text-muted); font-size: 13px;">Media: <span class="${calcolaColore(mediaRaw)}">${mediaRaw || '-'}</span></div><div><input type="number" class="pagella-input-voto ${calcolaColore(votoSuggerito)}" id="vfin-${m}" value="${votoSuggerito}" oninput="this.className='pagella-input-voto '+calcolaColore(this.value)"></div></div>`;
             });
             document.getElementById('pagellaAmmesso').value = pagellaTemp[s].ammesso ? "true" : "false";
             document.getElementById('modalCompilaStudente').classList.add('active');
@@ -553,163 +541,69 @@
             chiudiModal('modalCompilaStudente');
         }
         function salvaPagellaDefinitiva() {
-            let nomeP = prompt("Inserisci un nome per questa Pagella (es. 1° Quadrimestre):", "Pagella " + oggiStr.split('-').reverse().join('/'));
-            if(!nomeP) return;
-            db.pagelle.push({ id: Date.now(), nome: nomeP, data: oggiStr, risultati: JSON.parse(JSON.stringify(pagellaTemp)) });
-            salvaDB(); 
-            alert("Pagella salvata con successo!"); 
-            cambiaPagina('pagelle', document.getElementById('btn-pagelle'));
+            let nomeP = prompt("Inserisci un nome per la Pagella:", "Pagella " + oggiStr.split('-').reverse().join('/'));
+            if(!nomeP) return; db.pagelle.push({ id: Date.now(), nome: nomeP, data: oggiStr, risultati: JSON.parse(JSON.stringify(pagellaTemp)) });
+            salvaDB(); alert("Pagella salvata nel cloud!"); cambiaPagina('pagelle', document.getElementById('btn-pagelle'));
         }
-
-        // ARCHIVIO PAGELLE
         function caricaElencoPagelle() {
             let div = document.getElementById('listaPagelleSalvate');
-            if(db.pagelle.length===0){ div.innerHTML="<p>Nessuna pagella salvata.</p>"; return; }
-            div.innerHTML = db.pagelle.map((p, i) => `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#18181b; border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px;">
-                    <div style="cursor:pointer; flex:1;" onclick="apriPagella(${i})">
-                        <h3 style="color:var(--accent-purple); margin-bottom:5px;">${p.nome}</h3>
-                        <span style="font-size:12px; color:var(--text-muted);">Creata il: ${p.data.split('-').reverse().join('/')}</span>
-                    </div>
-                    <button class="btn-cestino" onclick="eliminaPagella(${i})">🗑️</button>
-                </div>
-            `).join('');
+            if(!db.pagelle || db.pagelle.length===0){ div.innerHTML="<p>Nessuna pagella.</p>"; return; }
+            div.innerHTML = db.pagelle.map((p, i) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#18181b; border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px;"><div style="cursor:pointer; flex:1;" onclick="apriPagella(${i})"><h3 style="color:var(--accent-purple); margin-bottom:5px;">${p.nome}</h3><span style="font-size:12px; color:var(--text-muted);">Creata il: ${p.data.split('-').reverse().join('/')}</span></div><button class="btn-cestino" onclick="eliminaPagella(${i})">🗑️</button></div>`).join('');
         }
         function apriPagella(i) {
-            idPagellaAperta = i;
-            let p = db.pagelle[i];
-            document.getElementById('titoloPagellaAperta').innerText = p.nome;
-            document.getElementById('rinominaPagella').value = p.nome;
+            idPagellaAperta = i; let p = db.pagelle[i];
+            document.getElementById('titoloPagellaAperta').innerText = p.nome; document.getElementById('rinominaPagella').value = p.nome;
             let tb = document.getElementById('corpoTabellaPagellaAperta'); tb.innerHTML = '';
-            
             db.studenti.forEach(s => {
                 let dati = p.risultati[s];
-                if(dati) {
-                    let esitoTxt = dati.ammesso ? '<span style="color:#10b981;">Ammesso</span>' : '<span style="color:#f87171; font-weight:bold;">Non Ammesso</span>';
-                    let classNome = dati.ammesso ? 'clickable-name' : 'clickable-name name-danger';
-                    tb.innerHTML += `<tr>
-                        <td><span class="${classNome}" onclick="vediVotiStudentePagella('${s}')">${s}</span></td>
-                        <td>${esitoTxt}</td>
-                        <td><button class="btn" style="padding: 5px 10px;" onclick="vediVotiStudentePagella('${s}')">Vedi Voti</button></td>
-                    </tr>`;
-                }
+                if(dati) tb.innerHTML += `<tr><td><span class="${dati.ammesso?'clickable-name':'clickable-name name-danger'}" onclick="vediVotiStudentePagella('${s}')">${s}</span></td><td>${dati.ammesso?'<span style="color:#10b981;">Ammesso</span>':'<span style="color:#f87171;font-weight:bold;">Non Ammesso</span>'}</td><td><button class="btn" style="padding: 5px 10px;" onclick="vediVotiStudentePagella('${s}')">Vedi Voti</button></td></tr>`;
             });
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-dettaglio-pagella').classList.add('active');
+            document.getElementById('page-dettaglio-pagella').classList.add('active'); paginaAttiva = 'dettaglio-pagella';
         }
-        function aggiornaNomePagella() {
-            let nuovo = document.getElementById('rinominaPagella').value;
-            if(nuovo) {
-                db.pagelle[idPagellaAperta].nome = nuovo;
-                salvaDB(); 
-                document.getElementById('titoloPagellaAperta').innerText = db.pagelle[idPagellaAperta].nome;
-            }
-        }
+        function aggiornaNomePagella() { let n = document.getElementById('rinominaPagella').value; if(n) { db.pagelle[idPagellaAperta].nome = n; salvaDB(); document.getElementById('titoloPagellaAperta').innerText = n; } }
         function vediVotiStudentePagella(s) {
-            let dati = db.pagelle[idPagellaAperta].risultati[s];
-            document.getElementById('titoloVediVotiPagella').innerText = "Pagella di " + s;
-            let html = '<table style="margin-top:0;"><thead><tr><th>Materia</th><th>Voto Finale</th></tr></thead><tbody>';
-            for(let m in dati.voti) {
-                let v = dati.voti[m];
-                html += `<tr><td>${m}</td><td><b class="${calcolaColore(v)}">${v || '-'}</b></td></tr>`;
-            }
-            html += '</tbody></table>';
-            document.getElementById('listaVotiSalvatiPagella').innerHTML = html;
-            document.getElementById('esitoVediPagella').innerHTML = dati.ammesso ? '<span style="color:#10b981;">Esito: AMMESSO/A</span>' : '<span style="color:#f87171;">Esito: NON AMMESSO/A</span>';
+            let dati = db.pagelle[idPagellaAperta].risultati[s]; document.getElementById('titoloVediVotiPagella').innerText = "Pagella: " + s;
+            let html = '<table style="margin-top:0;"><thead><tr><th>Materia</th><th>Voto</th></tr></thead><tbody>';
+            for(let m in dati.voti) html += `<tr><td>${m}</td><td><b class="${calcolaColore(dati.voti[m])}">${dati.voti[m] || '-'}</b></td></tr>`;
+            html += '</tbody></table>'; document.getElementById('listaVotiSalvatiPagella').innerHTML = html;
+            document.getElementById('esitoVediPagella').innerHTML = dati.ammesso ? '<span style="color:#10b981;">AMMESSO/A</span>' : '<span style="color:#f87171;">NON AMMESSO/A</span>';
             document.getElementById('modalVediVotiPagella').classList.add('active');
         }
-        function eliminaPagella(i) { 
-            if(confirm("Eliminare questa pagella per sempre?")) { 
-                db.pagelle.splice(i,1); 
-                salvaDB(); 
-                caricaElencoPagelle(); 
-            } 
-        }
+        function eliminaPagella(i) { if(confirm("Eliminare pagella?")) { db.pagelle.splice(i,1); salvaDB(); } }
 
-        // UTILITY ATTIVITÀ E COMPITI
+        // --- ATTIVITÀ E COMPITI ---
         function aggiornaSelectMaterie() {
             let mHtml = db.materie.map(m => `<option value="${m}">${m}</option>`).join('');
-            ['attivitaMateria', 'filtroAttivita', 'compitiMateria', 'filtroCompiti'].forEach(id => {
-                let el = document.getElementById(id); 
-                if(el) { 
-                    let val = el.value; 
-                    el.innerHTML = mHtml; 
-                    if(db.materie.includes(val)) el.value = val; 
-                }
-            });
-            caricaRegistroAttivita(); 
-            caricaRegistroCompiti();
+            ['attivitaMateria', 'filtroAttivita', 'compitiMateria', 'filtroCompiti'].forEach(id => { let el = document.getElementById(id); if(el) { let val = el.value; el.innerHTML = mHtml; if(db.materie.includes(val)) el.value = val; } });
+            caricaRegistroAttivita(); caricaRegistroCompiti();
         }
-        
-        function salvaAttivita() { 
-            let t = document.getElementById('attivitaTesto').value.trim();
-            if(!t) { alert("Inserisci l'argomento!"); return; }
-            db.attivita.push({ materia: document.getElementById('attivitaMateria').value, data: document.getElementById('attivitaData').value, testo: t }); 
-            salvaDB(); 
-            document.getElementById('attivitaTesto').value=''; 
-            caricaRegistroAttivita(); 
-        }
-        
+        function salvaAttivita() { let t = document.getElementById('attivitaTesto').value.trim(); if(!t) return; db.attivita.push({ materia: document.getElementById('attivitaMateria').value, data: document.getElementById('attivitaData').value, testo: t }); salvaDB(); document.getElementById('attivitaTesto').value=''; }
         function caricaRegistroAttivita() {
-            let m = document.getElementById('filtroAttivita').value;
-            let tb = document.getElementById('tabellaStoricoAttivita'); tb.innerHTML = '';
+            let m = document.getElementById('filtroAttivita').value, tb = document.getElementById('tabellaStoricoAttivita'); tb.innerHTML = '';
             let arr = db.attivita.map((a,i)=>({...a, idx:i})).filter(a=>a.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data));
             if(!arr.length) tb.innerHTML = "<tr><td colspan='3'>Nessuna attività registrata.</td></tr>";
-            arr.forEach(a => {
-                tb.innerHTML += `<tr><td>${a.data.split('-').reverse().join('/')}</td><td>${a.testo}</td><td><button class="btn-cestino" onclick="db.attivita.splice(${a.idx},1); salvaDB(); caricaRegistroAttivita()">🗑️</button></td></tr>`;
-            });
+            arr.forEach(a => tb.innerHTML += `<tr><td>${a.data.split('-').reverse().join('/')}</td><td>${a.testo}</td><td><button class="btn-cestino" onclick="db.attivita.splice(${a.idx},1); salvaDB();">🗑️</button></td></tr>`);
         }
-        
-        function salvaCompiti() { 
-            let t = document.getElementById('compitiTesto').value.trim();
-            if(!t) { alert("Inserisci i compiti!"); return; }
-            db.compiti.push({ materia: document.getElementById('compitiMateria').value, data: document.getElementById('compitiData').value, testo: t }); 
-            salvaDB(); 
-            document.getElementById('compitiTesto').value=''; 
-            caricaRegistroCompiti();
-            caricaDashboard(); // Aggiorna i compiti sulla home
-        }
-        
+        function salvaCompiti() { let t = document.getElementById('compitiTesto').value.trim(); if(!t) return; db.compiti.push({ materia: document.getElementById('compitiMateria').value, data: document.getElementById('compitiData').value, testo: t }); salvaDB(); document.getElementById('compitiTesto').value=''; }
         function caricaRegistroCompiti() {
-            let m = document.getElementById('filtroCompiti').value;
-            let tb = document.getElementById('tabellaStoricoCompiti'); tb.innerHTML = '';
+            let m = document.getElementById('filtroCompiti').value, tb = document.getElementById('tabellaStoricoCompiti'); tb.innerHTML = '';
             let arr = db.compiti.map((c,i)=>({...c, idx:i})).filter(c=>c.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data));
-            if(!arr.length) tb.innerHTML = "<tr><td colspan='3'>Nessun compito assegnato.</td></tr>";
-            arr.forEach(c => {
-                tb.innerHTML += `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.testo}</td><td><button class="btn-cestino" onclick="db.compiti.splice(${c.idx},1); salvaDB(); caricaRegistroCompiti(); caricaDashboard();">🗑️</button></td></tr>`;
-            });
+            if(!arr.length) tb.innerHTML = "<tr><td colspan='3'>Nessun compito.</td></tr>";
+            arr.forEach(c => tb.innerHTML += `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.testo}</td><td><button class="btn-cestino" onclick="db.compiti.splice(${c.idx},1); salvaDB();">🗑️</button></td></tr>`);
         }
-        
-        // CONFIG E BACKUP
+
+        // --- CONFIGURAZIONE ---
         function caricaConfig() {
-            document.getElementById('listaStud').innerHTML = db.studenti.map((s,i) => `<span class="voto-item" style="background:#1c1c1f; padding:5px 10px;">${s} <b onclick="if(confirm('Rimuovere alunno?')) { db.studenti.splice(${i},1); salvaDB(); caricaConfig(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join('');
-            document.getElementById('listaMat').innerHTML = db.materie.map((m,i) => `<span class="voto-item" style="background:#1c1c1f; padding:5px 10px;">${m} <b onclick="if(confirm('Rimuovere materia?')) { db.materie.splice(${i},1); salvaDB(); caricaConfig(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join('');
+            document.getElementById('listaStud').innerHTML = db.studenti.map((s,i) => `<span class="voto-item" style="background:#1c1c1f; padding:5px 10px;">${s} <b onclick="if(confirm('Rimuovere?')) { db.studenti.splice(${i},1); salvaDB(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join('');
+            document.getElementById('listaMat').innerHTML = db.materie.map((m,i) => `<span class="voto-item" style="background:#1c1c1f; padding:5px 10px;">${m} <b onclick="if(confirm('Rimuovere?')) { db.materie.splice(${i},1); salvaDB(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join('');
         }
-        function aggiungiStudente() { let v = document.getElementById('nuovoStud').value.trim(); if(v && !db.studenti.includes(v)) { db.studenti.push(v); db.studenti.sort(); salvaDB(); document.getElementById('nuovoStud').value=''; caricaConfig(); } }
-        function aggiungiMateria() { let v = document.getElementById('nuovaMat').value.trim(); if(v && !db.materie.includes(v)) { db.materie.push(v); db.materie.sort(); salvaDB(); document.getElementById('nuovaMat').value=''; caricaConfig(); } }
+        function aggiungiStudente() { let v = document.getElementById('nuovoStud').value.trim(); if(v && !db.studenti.includes(v)) { db.studenti.push(v); db.studenti.sort(); salvaDB(); document.getElementById('nuovoStud').value=''; } }
+        function aggiungiMateria() { let v = document.getElementById('nuovaMat').value.trim(); if(v && !db.materie.includes(v)) { db.materie.push(v); db.materie.sort(); salvaDB(); document.getElementById('nuovaMat').value=''; } }
         
-        function esportaBackup() { 
-            let a = document.createElement('a'); 
-            a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db)); 
-            a.download = "backup_registro.json"; 
-            a.click(); 
-        }
-        function importaBackup(e) { 
-            let r = new FileReader(); 
-            r.onload = function(ev) { 
-                try { 
-                    db = JSON.parse(ev.target.result); 
-                    salvaDB(); 
-                    alert("Importato con successo!"); 
-                    location.reload(); 
-                } catch(err){ alert("Errore lettura file di backup."); } 
-            }; 
-            r.readAsText(e.target.files[0]); 
-        }
-        function resettatutto() { 
-            if(confirm("Cancellare TUTTO definitivamente?")) { 
-                localStorage.removeItem('db_cyberdark_final_v8'); 
-                location.reload(); 
+        function selezionaReset() { 
+            if(confirm("Sei sicuro? Cancellerai tutti i dati nel Cloud in modo definitivo!")) { 
+                database.ref('registroDati').remove().then(() => location.reload()); 
             } 
         }
     </script>
