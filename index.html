@@ -187,9 +187,10 @@
             <div id="panel-voto-multiplo" style="display:none; background:#18181b; padding:20px; border-radius:10px; border:1px solid var(--accent-purple); margin-bottom:20px;">
                 <h4 style="margin-bottom:10px; color:var(--accent-purple);">Seleziona gli studenti dalla tabella e inserisci il voto per tutti:</h4>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items: center;">
-                    <input type="number" id="votoValMultiplo" min="1" max="10" step="0.25" placeholder="Voto" style="width:120px; margin:0;">
+                    <input type="number" id="votoValMultiplo" min="1" max="10" step="0.25" placeholder="Voto" style="width:120px; margin:0;" oninput="if(this.value > 10) this.value = 10;">
                     <input type="date" id="votoDataMultiplo" style="width:180px; margin:0;">
                     <select id="votoTipoMultiplo" style="width:150px; margin:0;"><option value="Orale">Orale</option><option value="Scritto">Scritto</option><option value="Pratico">Pratico</option></select>
+                    <input type="text" id="votoCommentoMultiplo" placeholder="Commento" style="width:150px; margin:0;">
                     <label class="checkbox-item" style="margin:0;"><input type="checkbox" id="votoFaMediaMultiplo" checked> Fa Media</label>
                 </div>
                 <div style="margin-top:15px; display:flex; gap:10px;">
@@ -255,16 +256,24 @@
             </div>
             <div class="card">
                 <table>
-                    <thead><tr><th>Data</th><th>Studente</th><th>Tipo</th><th>Motivazione</th><th></th></tr></thead>
+                    <thead><tr><th>Data</th><th>Studente</th><th>Tipo</th><th>Motivazione</th><th>Azioni</th></tr></thead>
                     <tbody id="tabellaNote"></tbody>
                 </table>
             </div>
         </div>
 
         <div id="page-comunicazioni" class="page">
-            <h1>Comunicazioni alle Famiglie</h1>
+            <h1>Comunicazioni</h1>
             <div class="card">
                 <input type="text" id="comTitolo" placeholder="Titolo (es. Sciopero, Uscita Anticipata)">
+                <select id="comTarget" onchange="gestisciTargetComunicazione(this.value)" style="max-width: 220px;">
+                    <option value="Classe">Tutta la Classe</option>
+                    <option value="Solo Docente">Solo Docente</option>
+                    <option value="Singolo Studente">Singolo Studente</option>
+                    <option value="Più Studenti">Più Studenti</option>
+                </select>
+                <select id="comStudente" style="display:none; max-width: 220px;"></select>
+                <div id="comPiuStudenti" class="checkbox-grid" style="display:none; margin-top: 15px; margin-bottom: 15px;"></div>
                 <input type="date" id="comData" style="max-width: 220px;">
                 <textarea id="comTesto" rows="3" placeholder="Testo della comunicazione..."></textarea>
                 <button class="btn" onclick="salvaComunicazione()">Pubblica</button>
@@ -372,7 +381,7 @@
             <span class="close-modal" onclick="chiudiModal('modalDettaglioVoto')">&times;</span>
             <h3>Dettaglio Voto</h3>
             <div id="infoDettaglioVoto" style="margin: 20px 0; font-size: 16px; line-height: 1.8;"></div>
-            <!-- Modificato aggiungendo l'evento onclick -->
+            <button id="btnModificaVoto" class="btn" style="width:100%; margin-bottom:10px; background:#fb923c;" onclick="editaVoto()">✏️ Modifica Voto</button>
             <button id="btnEliminaVoto" class="btn btn-danger" style="width:100%;" onclick="eliminaVoto()">🗑️ Elimina Voto</button>
         </div>
     </div>
@@ -383,9 +392,10 @@
             <h3>Voto a <span id="nomeStudenteVotoSingolo" style="color:var(--accent-cyan)"></span></h3>
             
             <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
-                <input type="number" id="votoValSingolo" min="1" max="10" step="0.25" placeholder="Voto (es. 7.5)">
+                <input type="number" id="votoValSingolo" min="1" max="10" step="0.25" placeholder="Voto (es. 7.5)" oninput="if(this.value > 10) this.value = 10;">
                 <input type="date" id="votoDataSingolo">
                 <select id="votoTipoSingolo"><option value="Orale">Orale</option><option value="Scritto">Scritto</option><option value="Pratico">Pratico</option></select>
+                <input type="text" id="votoCommentoSingolo" placeholder="Commento (opzionale)">
                 <label class="checkbox-item" style="margin-bottom: 10px;">
                     <input type="checkbox" id="votoFaMediaSingolo" checked> <b>Fa Media</b>
                 </label>
@@ -417,6 +427,13 @@
         let oggiStr = new Date().toISOString().split('T')[0];
         let studDaGiustificareCorrente = "";
         let indiceVotoDaEliminare = -1;
+
+        // Variabili Globali per Modifiche (CRUD)
+        let editIdxVoto = -1;
+        let editIdxAtt = -1;
+        let editIdxComp = -1;
+        let editIdxNota = -1;
+        let editIdxCom = -1;
 
         // Variabili Pagelle e Nuova Logica Voti
         let bozzaPagella = { titolo: '', voti: {}, ammessi: {} };
@@ -487,7 +504,7 @@
             
             let hGiust = []; db.studenti.forEach(st=>{ let ev=getEventiDaGiustificare(st); if(ev.length>0) hGiust.push(`<li><span style="color:#fb923c;">⚠️ <b>${st}</b>: ${ev.length} eventi da giust.</span></li>`); });
             document.getElementById('dash-giustificazioni').innerHTML = hGiust.length ? hGiust.join('') : '<li style="color:#10b981;">Tutto giustificato.</li>';
-            let coms = [...db.comunicazioni].sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,3); document.getElementById('dash-comunicazioni').innerHTML = coms.length ? coms.map(x=>`<b>${x.titolo}</b> (${x.data})<br><span style="font-size:12px;">${x.testo}</span><br>`).join('<hr style="border-color:#262626; margin:5px 0;">') : 'Nessuna comunicazione.';
+            let coms = [...db.comunicazioni].sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,3); document.getElementById('dash-comunicazioni').innerHTML = coms.length ? coms.map(x=>`<b>${x.titolo}</b> (${x.data}) <span style="color:var(--accent-cyan); font-size:12px;">[${x.target || 'Classe'}]</span><br><span style="font-size:12px;">${x.testo}</span><br>`).join('<hr style="border-color:#262626; margin:5px 0;">') : 'Nessuna comunicazione.';
         }
 
         // --- APPELLO ---
@@ -532,12 +549,16 @@
                 let votiValidiMedia = votiStud.filter(v => v.faMedia !== false);
                 let media = votiValidiMedia.length ? (votiValidiMedia.reduce((acc, c) => acc + parseFloat(c.voto), 0) / votiValidiMedia.length).toFixed(2) : '-';
                 
+                let isAssente = db.presenze[oggiStr] && db.presenze[oggiStr][s] === 'Assente';
+                let colorNome = isAssente ? 'color:#ef4444;' : 'color:var(--accent-cyan);';
+                let clickNome = isAssente ? `onclick="event.stopPropagation(); alert('${s} oggi è assente.');"` : '';
+
                 tb.innerHTML += `
                 <tr class="stud-row-voto" style="cursor:pointer; transition:0.2s;" onclick="gestisciClickRigaVoti(this, '${s}')">
                     <td class="col-check-multiplo" style="display:none;" onclick="event.stopPropagation()">
                         <input type="checkbox" class="check-stud-multiplo" value="${s}">
                     </td>
-                    <td><b style="color:var(--accent-cyan); font-size:15px; text-decoration:underline; text-underline-offset:3px;">${s}</b></td>
+                    <td><span ${clickNome}><b style="${colorNome} font-size:15px; text-decoration:underline; text-underline-offset:3px;">${s}</b></span></td>
                     <td>${htmlVoti||'-'}</td>
                     <td class="${media!=='-'?calcolaColore(media):''}"><b>${media}</b></td>
                 </tr>`;
@@ -562,6 +583,7 @@
             document.querySelectorAll('.col-check-multiplo').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.check-stud-multiplo').forEach(cb => cb.checked = false);
             document.getElementById('votoValMultiplo').value = '';
+            document.getElementById('votoCommentoMultiplo').value = '';
         }
 
         function gestisciClickRigaVoti(riga, stud) {
@@ -572,6 +594,7 @@
                 studCorrenteVotoSingolo = stud;
                 document.getElementById('nomeStudenteVotoSingolo').innerText = stud;
                 document.getElementById('votoValSingolo').value = '';
+                document.getElementById('votoCommentoSingolo').value = '';
                 document.getElementById('votoDataSingolo').value = oggiStr;
                 document.getElementById('modalVotoSingolo').classList.add('active');
             }
@@ -581,29 +604,53 @@
             let v = document.getElementById('votoValSingolo').value;
             let d = document.getElementById('votoDataSingolo').value;
             let t = document.getElementById('votoTipoSingolo').value;
+            let c = document.getElementById('votoCommentoSingolo').value;
             let faMedia = document.getElementById('votoFaMediaSingolo').checked;
             
             if(!v) return alert("Inserisci un voto!");
+            if(parseFloat(v) > 10) return alert("Il voto non può essere superiore a 10!");
             
-            db.voti.push({studente: studCorrenteVotoSingolo, materia: window.materiaCorrente, voto: v, data: d, tipo: t, faMedia: faMedia});
+            if(editIdxVoto >= 0) {
+                db.voti[editIdxVoto] = {studente: studCorrenteVotoSingolo, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia};
+                editIdxVoto = -1;
+                document.getElementById('nomeStudenteVotoSingolo').innerText = studCorrenteVotoSingolo;
+            } else {
+                db.voti.push({studente: studCorrenteVotoSingolo, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia});
+            }
             salvaDB(); 
             chiudiModal('modalVotoSingolo'); 
             apriMateriaVoti(window.materiaCorrente);
+        }
+
+        function editaVoto() {
+            let v = db.voti[indiceVotoDaEliminare];
+            editIdxVoto = indiceVotoDaEliminare;
+            studCorrenteVotoSingolo = v.studente;
+            document.getElementById('nomeStudenteVotoSingolo').innerText = v.studente + " (Modifica)";
+            document.getElementById('votoValSingolo').value = v.voto;
+            document.getElementById('votoDataSingolo').value = v.data;
+            document.getElementById('votoTipoSingolo').value = v.tipo;
+            document.getElementById('votoFaMediaSingolo').checked = v.faMedia !== false;
+            document.getElementById('votoCommentoSingolo').value = v.commento || '';
+            chiudiModal('modalDettaglioVoto');
+            document.getElementById('modalVotoSingolo').classList.add('active');
         }
 
         function salvaVotoMultiplo() {
             let v = document.getElementById('votoValMultiplo').value;
             let d = document.getElementById('votoDataMultiplo').value;
             let t = document.getElementById('votoTipoMultiplo').value;
+            let c = document.getElementById('votoCommentoMultiplo').value;
             let faMedia = document.getElementById('votoFaMediaMultiplo').checked;
             
             let selezionati = Array.from(document.querySelectorAll('.check-stud-multiplo:checked')).map(cb => cb.value);
             
             if(selezionati.length === 0) return alert("Seleziona almeno uno studente mettendo la spunta!");
             if(!v) return alert("Inserisci un voto!");
+            if(parseFloat(v) > 10) return alert("Il voto non può essere superiore a 10!");
 
             selezionati.forEach(s => { 
-                db.voti.push({studente: s, materia: window.materiaCorrente, voto: v, data: d, tipo: t, faMedia: faMedia}); 
+                db.voti.push({studente: s, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia}); 
             });
             
             salvaDB(); 
@@ -613,11 +660,10 @@
 
         function apriDettaglioVoto(idx) {
             let v = db.voti[idx]; indiceVotoDaEliminare = idx;
-            document.getElementById('infoDettaglioVoto').innerHTML = `<b>Studente:</b> ${v.studente}<br><b>Voto:</b> <span style="font-size: 24px; color: ${v.voto>=6?'var(--voto-suff)':'var(--voto-insuff)'};">${v.voto}</span><br><b>Data:</b> ${v.data.split('-').reverse().join('/')}<br><b>Tipo:</b> ${v.tipo}<br><b>Fa Media:</b> ${v.faMedia===false?'<span style="color:#f87171">No</span>':'<span style="color:#4ade80">Sì</span>'}`;
+            document.getElementById('infoDettaglioVoto').innerHTML = `<b>Studente:</b> ${v.studente}<br><b>Voto:</b> <span style="font-size: 24px; color: ${v.voto>=6?'var(--voto-suff)':'var(--voto-insuff)'};">${v.voto}</span><br><b>Data:</b> ${v.data.split('-').reverse().join('/')}<br><b>Tipo:</b> ${v.tipo}<br><b>Fa Media:</b> ${v.faMedia===false?'<span style="color:#f87171">No</span>':'<span style="color:#4ade80">Sì</span>'}<br><b>Commento:</b> ${v.commento || '-'}`;
             document.getElementById('modalDettaglioVoto').classList.add('active');
         }
         
-        // CORREZIONE DELLA FUNZIONE RINOMINATA CON CARATTERI ERRATI
         function eliminaVoto() { 
             if(confirm("Eliminare questo voto?")) { 
                 db.voti.splice(indiceVotoDaEliminare, 1); 
@@ -628,19 +674,156 @@
         }
 
         // --- NOTE, COMUNICAZIONI, ATTIVITÀ ---
-        function caricaNote() { document.getElementById('noteCheckboxes').innerHTML = db.studenti.map(s => `<label class="checkbox-item"><input type="checkbox" class="check-nota-stud" value="${s}"> ${s}</label>`).join(''); let tb = document.getElementById('tabellaNote'); tb.innerHTML = ''; db.note.sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((n, i) => { tb.innerHTML += `<tr><td>${n.data.split('-').reverse().join('/')}</td><td><b>${n.studente}</b></td><td>${n.tipo}</td><td>${n.testo}</td><td><button class="btn-cestino" onclick="seEliminaNota(${i})">🗑️</button></td></tr>`; }); }
+        function caricaNote() { 
+            document.getElementById('noteCheckboxes').innerHTML = db.studenti.map(s => `<label class="checkbox-item"><input type="checkbox" class="check-nota-stud" value="${s}"> ${s}</label>`).join(''); 
+            let tb = document.getElementById('tabellaNote'); tb.innerHTML = ''; 
+            db.note.map((n,i)=>({...n, idx:i})).sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((n) => { 
+                tb.innerHTML += `<tr><td>${n.data.split('-').reverse().join('/')}</td><td><b>${n.studente}</b></td><td>${n.tipo}</td><td>${n.testo}</td><td><button class="btn-cestino" onclick="preparaModificaNota(${n.idx})">✏️</button> <button class="btn-cestino" onclick="seEliminaNota(${n.idx})">🗑️</button></td></tr>`; 
+            }); 
+        }
+        function preparaModificaNota(idx) {
+            let n = db.note[idx]; editIdxNota = idx;
+            document.querySelectorAll('.check-nota-stud').forEach(cb => cb.checked = (cb.value === n.studente));
+            document.getElementById('notaTipo').value = n.tipo;
+            document.getElementById('notaData').value = n.data;
+            document.getElementById('notaTesto').value = n.testo;
+            document.querySelector('#page-note .btn-danger').innerText = "Aggiorna Nota";
+        }
         function selezionaTuttiNote(checked) { document.querySelectorAll('.check-nota-stud').forEach(cb => cb.checked = checked); }
-        function salvaNota() { let t = document.getElementById('notaTesto').value; let sel = Array.from(document.querySelectorAll('.check-nota-stud:checked')).map(cb => cb.value); if(sel.length===0) return alert("Seleziona studente!"); if(!t) return alert("Motivazione mancante."); let d = document.getElementById('notaData').value, tip = document.getElementById('notaTipo').value; sel.forEach(s => db.note.push({studente: s, tipo: tip, data: d, testo: t})); salvaDB(); caricaNote(); document.getElementById('notaTesto').value=''; }
+        function salvaNota() { 
+            let t = document.getElementById('notaTesto').value; 
+            let sel = Array.from(document.querySelectorAll('.check-nota-stud:checked')).map(cb => cb.value); 
+            if(sel.length===0) return alert("Seleziona studente!"); 
+            if(!t) return alert("Motivazione mancante."); 
+            let d = document.getElementById('notaData').value, tip = document.getElementById('notaTipo').value; 
+            if(editIdxNota >= 0) {
+                db.note[editIdxNota] = {studente: sel[0], tipo: tip, data: d, testo: t}; 
+                editIdxNota = -1;
+                document.querySelector('#page-note .btn-danger').innerText = "Salva Nota";
+            } else {
+                sel.forEach(s => db.note.push({studente: s, tipo: tip, data: d, testo: t})); 
+            }
+            salvaDB(); caricaNote(); document.getElementById('notaTesto').value=''; 
+        }
         function seEliminaNota(idx) { if(confirm("Eliminare nota?")) { db.note.splice(idx,1); salvaDB(); caricaNote(); } }
         
-        function caricaComunicazioni() { let tb = document.getElementById('tabellaComunicazioni'); tb.innerHTML = ''; db.comunicazioni.sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((c, i) => { tb.innerHTML += `<tr><td><b>${c.data.split('-').reverse().join('/')}</b><br><span style="color:var(--accent-purple);">${c.titolo}</span><br><span style="font-size:13px; color:var(--text-muted);">${c.testo}</span></td><td><button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.comunicazioni.splice(${i},1); salvaDB(); caricaComunicazioni();}">🗑️</button></td></tr>`; }); }
-        function salvaComunicazione() { let t = document.getElementById('comTitolo').value, txt = document.getElementById('comTesto').value; if(!t||!txt) return; db.comunicazioni.push({titolo:t, data:document.getElementById('comData').value, testo:txt}); salvaDB(); caricaComunicazioni(); }
+        function gestisciTargetComunicazione(val) {
+            document.getElementById('comStudente').style.display = val === 'Singolo Studente' ? 'inline-block' : 'none';
+            document.getElementById('comPiuStudenti').style.display = val === 'Più Studenti' ? 'grid' : 'none';
+        }
+
+        function caricaComunicazioni() { 
+            let tb = document.getElementById('tabellaComunicazioni'); tb.innerHTML = ''; 
+            if(document.getElementById('comStudente').options.length === 0) {
+                document.getElementById('comStudente').innerHTML = db.studenti.map(s => `<option value="${s}">${s}</option>`).join('');
+            }
+            if(document.getElementById('comPiuStudenti').innerHTML === '') {
+                document.getElementById('comPiuStudenti').innerHTML = db.studenti.map(s => `<label class="checkbox-item"><input type="checkbox" class="check-com-stud" value="${s}"> ${s}</label>`).join('');
+            }
+            db.comunicazioni.map((c,i)=>({...c, idx:i})).sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((c) => { 
+                tb.innerHTML += `<tr><td><b>${c.data.split('-').reverse().join('/')}</b><br><span style="color:var(--accent-purple);">${c.titolo}</span><br><span style="font-size:12px; color:var(--accent-cyan);">Destinatario: ${c.target || 'Classe'}</span><br><span style="font-size:13px; color:var(--text-muted);">${c.testo}</span></td><td><button class="btn-cestino" onclick="preparaModificaComunicazione(${c.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.comunicazioni.splice(${c.idx},1); salvaDB(); caricaComunicazioni();}">🗑️</button></td></tr>`; 
+            }); 
+        }
+
+        function preparaModificaComunicazione(idx) {
+            let c = db.comunicazioni[idx]; editIdxCom = idx;
+            document.getElementById('comTitolo').value = c.titolo;
+            document.getElementById('comData').value = c.data;
+            document.getElementById('comTesto').value = c.testo;
+            
+            let tgt = c.target || 'Classe';
+            if(tgt.startsWith('Alunno: ')) {
+                document.getElementById('comTarget').value = 'Singolo Studente';
+                gestisciTargetComunicazione('Singolo Studente');
+                document.getElementById('comStudente').value = tgt.replace('Alunno: ', '');
+            } else if (tgt.startsWith('Alunni: ')) {
+                document.getElementById('comTarget').value = 'Più Studenti';
+                gestisciTargetComunicazione('Più Studenti');
+                let studList = tgt.replace('Alunni: ', '').split(', ');
+                document.querySelectorAll('.check-com-stud').forEach(cb => {
+                    cb.checked = studList.includes(cb.value);
+                });
+            } else {
+                document.getElementById('comTarget').value = tgt;
+                gestisciTargetComunicazione(tgt);
+            }
+            document.querySelector('#page-comunicazioni .btn').innerText = "Aggiorna";
+        }
+        
+        function salvaComunicazione() { 
+            let t = document.getElementById('comTitolo').value, txt = document.getElementById('comTesto').value; 
+            if(!t||!txt) return; 
+            
+            let target = document.getElementById('comTarget').value;
+            if(target === 'Singolo Studente') {
+                target = "Alunno: " + document.getElementById('comStudente').value;
+            } else if (target === 'Più Studenti') {
+                let sel = Array.from(document.querySelectorAll('.check-com-stud:checked')).map(cb => cb.value);
+                if(sel.length === 0) return alert("Seleziona almeno uno studente!");
+                target = "Alunni: " + sel.join(', ');
+            }
+
+            if(editIdxCom >= 0) {
+                db.comunicazioni[editIdxCom] = {titolo:t, data:document.getElementById('comData').value, testo:txt, target: target};
+                editIdxCom = -1;
+                document.querySelector('#page-comunicazioni .btn').innerText = "Pubblica";
+            } else {
+                db.comunicazioni.push({titolo:t, data:document.getElementById('comData').value, testo:txt, target: target}); 
+            }
+            
+            salvaDB(); 
+            caricaComunicazioni(); 
+            
+            document.getElementById('comTitolo').value=''; 
+            document.getElementById('comTesto').value='';
+            document.getElementById('comTarget').value='Classe';
+            gestisciTargetComunicazione('Classe');
+            document.querySelectorAll('.check-com-stud').forEach(cb => cb.checked=false);
+        }
         
         function aggiornaSelectMaterie() { let mHtml = db.materie.map(m => `<option value="${m}">${m}</option>`).join(''); ['attivitaMateria', 'filtroAttivita', 'compitiMateria', 'filtroCompiti'].forEach(id => { let el = document.getElementById(id); if(el) { let val = el.value; el.innerHTML = '<option value="" disabled selected>Materia...</option>' + mHtml; if(db.materie.includes(val)) el.value = val; } }); caricaRegistroAttivita(); caricaRegistroCompiti(); }
-        function salvaAttivita() { let m=document.getElementById('attivitaMateria').value, t = document.getElementById('attivitaTesto').value.trim(); if(!t||!m) return; db.attivita.push({ materia:m, data:document.getElementById('attivitaData').value, testo:t }); salvaDB(); document.getElementById('attivitaTesto').value=''; caricaRegistroAttivita();}
-        function caricaRegistroAttivita() { let m = document.getElementById('filtroAttivita').value, tb = document.getElementById('tabellaStoricoAttivita'); tb.innerHTML=''; db.attivita.map((a,i)=>({...a, idx:i})).filter(a=>a.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(a => tb.innerHTML += `<tr><td>${a.data.split('-').reverse().join('/')}</td><td>${a.testo}</td><td><button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.attivita.splice(${a.idx},1); salvaDB(); caricaRegistroAttivita();}">🗑️</button></td></tr>`); }
-        function salvaCompiti() { let m=document.getElementById('compitiMateria').value, t = document.getElementById('compitiTesto').value.trim(); if(!t||!m) return; db.compiti.push({ materia:m, data:document.getElementById('compitiData').value, testo:t }); salvaDB(); document.getElementById('compitiTesto').value=''; caricaRegistroCompiti();}
-        function caricaRegistroCompiti() { let m = document.getElementById('filtroCompiti').value, tb = document.getElementById('tabellaStoricoCompiti'); tb.innerHTML=''; db.compiti.map((c,i)=>({...c, idx:i})).filter(c=>c.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(c => tb.innerHTML += `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.testo}</td><td><button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.compiti.splice(${c.idx},1); salvaDB(); caricaRegistroCompiti();}">🗑️</button></td></tr>`); }
+        
+        function preparaModificaAttivita(idx) {
+            let a = db.attivita[idx]; editIdxAtt = idx;
+            document.getElementById('attivitaMateria').value = a.materia;
+            document.getElementById('attivitaData').value = a.data;
+            document.getElementById('attivitaTesto').value = a.testo;
+            document.querySelector('#page-attivita .btn').innerText = "Aggiorna";
+        }
+        function salvaAttivita() { 
+            let m=document.getElementById('attivitaMateria').value, t = document.getElementById('attivitaTesto').value.trim(); 
+            if(!t||!m) return; 
+            if(editIdxAtt >= 0) {
+                db.attivita[editIdxAtt] = { materia:m, data:document.getElementById('attivitaData').value, testo:t };
+                editIdxAtt = -1;
+                document.querySelector('#page-attivita .btn').innerText = "Registra";
+            } else {
+                db.attivita.push({ materia:m, data:document.getElementById('attivitaData').value, testo:t }); 
+            }
+            salvaDB(); document.getElementById('attivitaTesto').value=''; caricaRegistroAttivita();
+        }
+        function caricaRegistroAttivita() { let m = document.getElementById('filtroAttivita').value, tb = document.getElementById('tabellaStoricoAttivita'); tb.innerHTML=''; db.attivita.map((a,i)=>({...a, idx:i})).filter(a=>a.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(a => tb.innerHTML += `<tr><td>${a.data.split('-').reverse().join('/')}</td><td>${a.testo}</td><td><button class="btn-cestino" onclick="preparaModificaAttivita(${a.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.attivita.splice(${a.idx},1); salvaDB(); caricaRegistroAttivita();}">🗑️</button></td></tr>`); }
+        
+        function preparaModificaCompito(idx) {
+            let c = db.compiti[idx]; editIdxComp = idx;
+            document.getElementById('compitiMateria').value = c.materia;
+            document.getElementById('compitiData').value = c.data;
+            document.getElementById('compitiTesto').value = c.testo;
+            document.querySelector('#page-compiti .btn').innerText = "Aggiorna";
+        }
+        function salvaCompiti() { 
+            let m=document.getElementById('compitiMateria').value, t = document.getElementById('compitiTesto').value.trim(); 
+            if(!t||!m) return; 
+            if(editIdxComp >= 0) {
+                db.compiti[editIdxComp] = { materia:m, data:document.getElementById('compitiData').value, testo:t };
+                editIdxComp = -1;
+                document.querySelector('#page-compiti .btn').innerText = "Assegna";
+            } else {
+                db.compiti.push({ materia:m, data:document.getElementById('compitiData').value, testo:t }); 
+            }
+            salvaDB(); document.getElementById('compitiTesto').value=''; caricaRegistroCompiti();
+        }
+        function caricaRegistroCompiti() { let m = document.getElementById('filtroCompiti').value, tb = document.getElementById('tabellaStoricoCompiti'); tb.innerHTML=''; db.compiti.map((c,i)=>({...c, idx:i})).filter(c=>c.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(c => tb.innerHTML += `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.testo}</td><td><button class="btn-cestino" onclick="preparaModificaCompito(${c.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.compiti.splice(${c.idx},1); salvaDB(); caricaRegistroCompiti();}">🗑️</button></td></tr>`); }
 
         // --- CREAZIONE PAGELLA GLOBALE ---
         function inizializzaBozzaPagella() { if(!bozzaPagella.voti) bozzaPagella.voti={}; if(!bozzaPagella.ammessi) bozzaPagella.ammessi={}; db.studenti.forEach(s=>{ if(bozzaPagella.ammessi[s]===undefined) bozzaPagella.ammessi[s]=true; }); document.getElementById('pagellaTitolo').value = bozzaPagella.titolo; }
@@ -658,7 +841,7 @@
             if(!bozzaPagella.voti[m]) bozzaPagella.voti[m] = {};
             db.studenti.forEach(s => {
                 let vv = db.voti.filter(v => v.materia===m && v.studente===s && v.faMedia!==false); let med = vv.length?(vv.reduce((acc,c)=>acc+parseFloat(c.voto),0)/vv.length).toFixed(2):'-';
-                let v = bozzaPagella.voti[m][s] || ''; tb.innerHTML += `<tr><td><b style="font-size:15px;">${s}</b></td><td style="color:var(--accent-cyan); font-weight:bold; font-size:16px;">${med}</td><td><input type="number" id="pagella_draft_voto_${s}" min="1" max="10" step="0.5" value="${v}" placeholder="Voto" style="max-width:120px; margin:0; font-weight:bold;"></td></tr>`;
+                let v = bozzaPagella.voti[m][s] || ''; tb.innerHTML += `<tr><td><b style="font-size:15px;">${s}</b></td><td style="color:var(--accent-cyan); font-weight:bold; font-size:16px;">${med}</td><td><input type="number" id="pagella_draft_voto_${s}" min="1" max="10" step="0.5" value="${v}" placeholder="Voto" style="max-width:120px; margin:0; font-weight:bold;" oninput="if(this.value > 10) this.value = 10;"></td></tr>`;
             }); cambiaPagina('compila-materia-pagella');
         }
         function salvaMateriaPagella() { let m = materiaPagellaCorrente; if(!bozzaPagella.voti[m]) bozzaPagella.voti[m]={}; db.studenti.forEach(s=>{ let val=document.getElementById(`pagella_draft_voto_${s}`).value; if(val) bozzaPagella.voti[m][s]=val; else delete bozzaPagella.voti[m][s]; }); cambiaPagina('crea-pagella'); }
