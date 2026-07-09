@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Elettronico CyberDark Cloud</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-black: #000000;
+            --bg-card: #121214;
+            --bg-sidebar: #0a0a0c;
+            --border-color: #262626;
+            --text-light: #f4f4f5;
+            --text-muted: #a1a1aa;
+            
+            --accent-purple: #a855f7;
+            --accent-cyan: #06b6d4;
+            
+            --voto-suff: #4ade80;
+            --voto-insuff: #f87171;
+
+            --c-presente: rgba(16, 185, 129, 0.15); --t-presente: #4ade80;
+            --c-assente: rgba(239, 68, 68, 0.15); --t-assente: #f87171;
+            --c-ritardo: rgba(249, 115, 22, 0.15); --t-ritardo: #f97316;
+            --c-uscito: rgba(59, 130, 246, 0.15); --t-uscito: #3b82f6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+
+        body { display: flex; height: 100vh; background-color: var(--bg-black); color: var(--text-light); overflow: hidden; }
+
+        #btn-toggle-menu { position: absolute; top: 15px; left: 15px; z-index: 1000; background: var(--bg-card); border: 1px solid var(--border-color); color: white; padding: 10px 14px; font-size: 18px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        #btn-toggle-menu:hover { border-color: var(--accent-cyan); }
+
+        .sidebar { width: 260px; background-color: var(--bg-sidebar); padding: 70px 15px 25px 15px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); overflow-y: auto; transition: transform 0.3s ease; position: absolute; height: 100%; z-index: 900; }
+        .sidebar.nascosta { transform: translateX(-100%); }
+        .sidebar h2 { margin-bottom: 20px; font-size: 20px; text-align: center; color: var(--accent-purple); font-weight: 800; }
+        .nav-btn { background: none; border: none; color: var(--text-muted); padding: 12px 15px; text-align: left; font-size: 14px; cursor: pointer; border-radius: 8px; margin-bottom: 5px; transition: all 0.2s ease; display: flex; align-items: center; gap: 10px; width: 100%; font-weight: 600; }
+        .nav-btn:hover { background-color: #18181b; color: var(--text-light); }
+        .nav-btn.active { background-color: var(--accent-purple); color: white; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4); }
+
+        .main-content { flex: 1; padding: 70px 40px 40px 40px; overflow-y: auto; transition: margin-left 0.3s ease; margin-left: 260px; }
+        .main-content.allargato { margin-left: 0; }
+        
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1 { margin-bottom: 25px; font-size: 26px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .card { background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid var(--border-color); overflow-x: auto; }
+        
+        input, select, textarea { padding: 10px; background-color: #1c1c1f; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; color: white; width: 100%; margin-bottom: 15px; }
+        input[type="checkbox"] { width: auto; margin-bottom: 0; transform: scale(1.2); cursor: pointer; margin-right: 8px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-cyan); }
+        
+        .btn { background-color: var(--accent-cyan); color: black; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; transform: scale(0.98); }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-success { background-color: #10b981; color: white; }
+        .btn-small { padding: 5px 10px; font-size: 12px; }
+        .btn-cestino { background: transparent; border: none; font-size: 16px; cursor: pointer; padding: 5px; }
+        .btn-cestino:hover { transform: scale(1.2); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 600px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+        th { background-color: #18181b; color: var(--text-muted); font-size: 13px; text-transform: uppercase; }
+
+        .clickable-name { color: var(--accent-cyan); cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+
+        .row-Presente { background-color: var(--c-presente); border-left: 4px solid var(--t-presente); }
+        .row-Assente { background-color: var(--c-assente); border-left: 4px solid var(--t-assente); }
+        .row-Ritardo { background-color: var(--c-ritardo); border-left: 4px solid var(--t-ritardo); }
+        .row-Uscito { background-color: var(--c-uscito); border-left: 4px solid var(--t-uscito); }
+        select.select-stato { background-color: #18181b; border: 1px solid rgba(255,255,255,0.1); color: inherit; width: auto; margin: 0; font-weight: bold; }
+
+        .voto-item { display: inline-block; margin-right: 6px; font-weight: bold; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid transparent; }
+        .voto-item:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
+        .voto-verde { background: rgba(74, 222, 128, 0.1); color: var(--voto-suff); }
+        .voto-rosso { background: rgba(248, 113, 113, 0.1); color: var(--voto-insuff); }
+        .voto-no-media { background: rgba(6, 182, 212, 0.15) !important; color: #22d3ee !important; border: 1px dashed #06b6d4 !important; }
+        .voto-A { background: transparent !important; color: #ef4444 !important; border: none !important; }
+        .voto-IMP { background: rgba(59, 130, 246, 0.2) !important; color: #3b82f6 !important; border: 1px solid #3b82f6 !important; }
+
+        .grid-materie { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .card-materia { background: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; transition: 0.2s; position: relative; }
+        .card-materia:hover { border-color: var(--accent-cyan); background: #18181b; }
+
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .dash-box { background: #18181b; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); }
+        .dash-box h4 { color: var(--accent-purple); margin-bottom: 10px; font-size: 15px; }
+
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; width: 500px; max-height: 85vh; overflow-y: auto; position: relative; }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; color: var(--text-muted); cursor: pointer; }
+        
+        #sync-status { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+        .status-ok { color: #10b981 !important; }
+        
+        .stats-details { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+        
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #18181b; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px; max-height: 200px; overflow-y: auto; }
+        .checkbox-item { display: flex; align-items: center; font-size: 14px; }
+        
+        .card-studente-archivio { padding: 12px; background: #1c1c1f; border-radius: 8px; border: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: 0.2s; }
+        .card-studente-archivio:hover { border-color: var(--accent-cyan); background: #27272a; }
+
+        .stud-row-voto:hover { background-color: #1c1c1f; }
+        .click-stats:hover { color: var(--accent-cyan) !important; }
+
+        /* Schermata di Login CyberDark */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-black); display: flex; align-items: center; justify-content: center; z-index: 10000; flex-direction: column; }
+        .login-box { background: var(--bg-card); border: 1px solid var(--border-color); padding: 40px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input[type="text"], .login-box input[type="password"], .login-box input[type="email"] { width: 100%; padding: 12px; margin: 10px 0; background: #18181b; border: 1px solid var(--border-color); color: var(--text-light); border-radius: 6px; outline: none; font-size: 16px; box-sizing: border-box; }
+        .login-box input:focus { border-color: var(--accent-purple); }
+        .login-box button { width: 100%; padding: 12px; background: var(--accent-purple); border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 5px; transition: 0.2s; }
+        .login-box button:hover { background: #9333ea; }
+        .login-box .btn-reg { background: #27272a; margin-top: 15px; color: var(--text-muted); font-size: 14px; }
+        .login-box .btn-reg:hover { background: #3f3f46; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="color: var(--accent-cyan); margin-bottom: 5px; font-size: 24px;">CyberDark Cloud</h2>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Accedi al Registro Elettronico</p>
+            <input type="text" id="login-username" placeholder="Nome Utente (es. admin)" autocomplete="username">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+            
+            <label style="display:flex; align-items:center; color:var(--text-muted); font-size:14px; margin: 10px 0; cursor:pointer;">
+                <input type="checkbox" id="ricorda-pwd" checked style="margin-right:8px; width:auto; transform:scale(1);"> Mantenimi Collegato
+            </label>
+
+            <button onclick="effettuaLogin()">Accedi</button>
+            <button class="btn-reg" onclick="effettuaRegistrazione()">Nuovo Insegnante? Registrati</button>
+            <p id="login-error" style="color: var(--voto-insuff); margin-top: 15px; font-size: 14px; min-height: 20px;"></p>
+        </div>
+    </div>
+
+    <button id="btn-toggle-menu" onclick="toggleSidebar()">☰ Menu</button>
+
+    <div class="sidebar" id="sidebar">
+        <h2>CYBERDARK</h2>
+        
+        <div style="padding: 0 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+            <span style="font-size:12px; color:var(--accent-cyan); font-weight:bold;">CLASSE SELEZIONATA:</span>
+            <select id="selettore-classe" onchange="cambiaClasseCorrente(this.value)" style="width:100%; margin:5px 0 0 0; padding:8px; background:#18181b; border:1px solid var(--accent-purple);"></select>
+        </div>
+
+        <button id="btn-dashboard" class="nav-btn active" onclick="cambiaPagina('dashboard', this)">🏠 Dashboard</button>
+        <button id="btn-presenze" class="nav-btn" onclick="cambiaPagina('presenze', this)">📅 Appello</button>
+        <button id="btn-voti" class="nav-btn" onclick="cambiaPagina('voti', this)">📚 Voti</button>
+        <button id="btn-attivita" class="nav-btn" onclick="cambiaPagina('attivita', this)">📝 Attività</button>
+        <button id="btn-compiti" class="nav-btn" onclick="cambiaPagina('compiti', this)">🎒 Compiti</button>
+        <button id="btn-note" class="nav-btn" onclick="cambiaPagina('note', this)">⚠️ Note</button>
+        <button id="btn-comunicazioni" class="nav-btn" onclick="cambiaPagina('comunicazioni', this)">📢 Comunicazioni</button>
+        <div style="margin: 15px 0; border-top: 1px solid var(--border-color);"></div>
+        <button id="btn-crea-pagella" class="nav-btn" onclick="cambiaPagina('crea-pagella', this)">✍️ Crea Pagella</button>
+        <button id="btn-pagelle" class="nav-btn" onclick="cambiaPagina('pagelle', this)">📁 Archivio Pagelle</button>
+        <div style="margin: auto 0 10px 0;"></div>
+        <button id="btn-config" class="nav-btn" onclick="cambiaPagina('config', this)">⚙️ Impostazioni</button>
+        <button id="btn-logout" class="nav-btn" onclick="effettuaLogout()">🚪 Esci</button>
+        <div id="sync-status">Connessione... ⏳</div>
+    </div>
+
+    <div class="main-content" id="main-content">
+        <div id="page-dashboard" class="page active">
+            <h1>Riepilogo del Giorno <input type="date" id="dataGlobale" style="max-width: 200px; margin: 0; display: inline-block;" onchange="cambiaDataGlobale(this.value)"></h1>
+            <div class="dash-grid">
+                <div class="dash-box">
+                    <h4>📊 Presenze, Assenze e Ritardi (<span id="dash-data-oggi"></span>)</h4>
+                    <ul id="dash-assenti" style="list-style: none; font-size: 14px; line-height: 1.6;"></ul>
+                </div>
+                <div class="dash-box">
+                    <h4>⚠️ Eventi da Giustificare</h4>
+                    <ul id="dash-giustificazioni" style="list-style: none; font-size: 14px; line-height: 1.6;"></ul>
+                </div>
+                <div class="dash-box">
+                    <h4>🎒 Compiti in Scadenza Oggi</h4>
+                    <ul id="dash-compiti" style="list-style: none; color: var(--text-muted); font-size: 14px; line-height: 1.6;"></ul>
+                </div>
+                <div class="dash-box">
+                    <h4>📝 Attività Svolte Oggi</h4>
+                    <ul id="dash-attivita" style="list-style: none; color: var(--text-muted); font-size: 14px; line-height: 1.6;"></ul>
+                </div>
+                <div class="dash-box">
+                    <h4>📢 Ultime Comunicazioni</h4>
+                    <div id="dash-comunicazioni" style="color: var(--text-muted); font-size: 14px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-presenze" class="page">
+            <h1 style="align-items: flex-start;">
+                Appello Giornaliero 
+                <button class="btn btn-success" onclick="salvaPresenzeConAvviso()">💾 Salva Presenze</button>
+            </h1>
+            <div class="card">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; background: #1c1c1f; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <input type="date" id="dataAppello" style="max-width: 150px; margin:0;" onchange="caricaAppello()">
+                    <span style="color:var(--text-muted); font-size:14px; font-weight:bold;">Orario:</span>
+                    <input type="time" id="oraInizioAppello" style="max-width: 100px; margin:0; padding:6px;" onchange="salvaInfoAppello()">
+                    <span style="color:var(--text-muted);">-</span>
+                    <input type="time" id="oraFineAppello" style="max-width: 100px; margin:0; padding:6px;" onchange="salvaInfoAppello()">
+                    <button class="btn btn-small" style="background:var(--accent-purple); color:white;" onclick="impostaOraAttualeAppello()">🕒 Inserisci Ora Attuale</button>
+                </div>
+                <table>
+                    <thead><tr><th>Studente e Statistiche</th><th>Stato e Orario Specifico</th></tr></thead>
+                    <tbody id="tabellaPresenze"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="page-voti" class="page">
+            <h1>Registro Valutazioni</h1>
+            <div id="grigliaMaterieVoti" class="grid-materie"></div>
+        </div>
+
+        <div id="page-dettaglio-voti" class="page">
+            <h1 id="titoloMateriaVoti" style="margin-bottom: 10px;">Materia</h1>
+            <div style="display:flex; gap:10px; margin-bottom: 20px;">
+                <button class="btn" style="background:#27272a; color:white;" onclick="cambiaPagina('voti', document.getElementById('btn-voti'))">⬅ Indietro</button>
+                <button id="btn-toggle-multiplo" class="btn" onclick="attivaVotoMultiplo()">➕ Aggiungi Voto Multiplo</button>
+                <button id="btn-voti-classe" class="btn btn-success" onclick="attivaVotiClasse()">📋 Inserisci Voti alla Classe</button>
+            </div>
+            
+            <div id="panel-voto-multiplo" style="display:none; background:#18181b; padding:20px; border-radius:10px; border:1px solid var(--accent-purple); margin-bottom:20px;">
+                <h4 style="margin-bottom:10px; color:var(--accent-purple);">Seleziona gli studenti dalla tabella e inserisci il voto per tutti:</h4>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items: center;">
+                    <input type="text" id="votoValMultiplo" placeholder="Voto" style="width:120px; margin:0;">
+                    <input type="date" id="votoDataMultiplo" style="width:180px; margin:0;">
+                    <select id="votoTipoMultiplo" style="width:150px; margin:0;"><option value="Orale">Orale</option><option value="Scritto">Scritto</option><option value="Pratico">Pratico</option></select>
+                    <input type="text" id="votoCommentoMultiplo" placeholder="Commento" style="width:150px; margin:0;">
+                    <label class="checkbox-item" style="margin:0;"><input type="checkbox" id="votoFaMediaMultiplo" checked> Fa Media</label>
+                </div>
+                <div style="margin-top:15px; display:flex; gap:10px;">
+                    <button class="btn btn-success" onclick="salvaVotoMultiplo()">💾 Salva per i selezionati</button>
+                    <button class="btn btn-danger" onclick="disattivaVotoMultiplo()">Annulla</button>
+                </div>
+            </div>
+
+            <div id="panel-voti-classe" style="display:none; background:#18181b; padding:20px; border-radius:10px; border:1px solid var(--accent-cyan); margin-bottom:20px;">
+                <h4 style="margin-bottom:10px; color:var(--accent-cyan);">Inserisci opzioni comuni per i voti della classe:</h4>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items: center;">
+                    <input type="date" id="votoDataClasse" style="width:180px; margin:0;" onchange="aggiornaAutoAssentiClasse()">
+                    <select id="votoTipoClasse" style="width:150px; margin:0;"><option value="Orale">Orale</option><option value="Scritto">Scritto</option><option value="Pratico">Pratico</option></select>
+                    <input type="text" id="votoCommentoClasse" placeholder="Commento" style="width:150px; margin:0;">
+                    <label class="checkbox-item" style="margin:0;"><input type="checkbox" id="votoFaMediaClasse" checked> Fa Media</label>
+                </div>
+                <div style="margin-top:15px; display:flex; gap:10px;">
+                    <button class="btn btn-success" onclick="salvaVotiClasse()">💾 Salva Voti Classe</button>
+                    <button class="btn btn-danger" onclick="disattivaVotiClasse()">Annulla</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:15px;">🖱️ <i>Clicca direttamente sul nome dello studente per inserire un voto singolo.</i></p>
+                <table>
+                    <thead>
+                        <tr id="thead-voti-row"></tr>
+                    </thead>
+                    <tbody id="corpoTabellaVoti"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="page-attivita" class="page">
+            <h1>Attività Svolte</h1>
+            <div class="card">
+                <select id="attivitaMateria"></select>
+                <input type="date" id="attivitaData" style="max-width: 220px;">
+                <textarea id="attivitaTesto" rows="2" placeholder="Argomento..."></textarea>
+                <button class="btn" onclick="salvaAttivita()">Registra</button>
+            </div>
+            <div class="card">
+                <select id="filtroAttivita" onchange="caricaRegistroAttivita()"></select>
+                <table><tbody id="tabellaStoricoAttivita"></tbody></table>
+            </div>
+        </div>
+
+        <div id="page-compiti" class="page">
+            <h1>Compiti Assegnati</h1>
+            <div class="card">
+                <select id="compitiMateria"></select>
+                <input type="date" id="compitiData" style="max-width: 220px;">
+                <textarea id="compitiTesto" rows="2" placeholder="Compiti..."></textarea>
+                <button class="btn" onclick="salvaCompiti()">Assegna</button>
+            </div>
+            <div class="card">
+                <select id="filtroCompiti" onchange="caricaRegistroCompiti()"></select>
+                <table><tbody id="tabellaStoricoCompiti"></tbody></table>
+            </div>
+        </div>
+
+        <div id="page-note" class="page">
+            <h1>Note Disciplinari e Generiche</h1>
+            <div class="card">
+                <div style="margin-bottom: 10px;"><b>Seleziona Studenti:</b></div>
+                <label class="checkbox-item" style="margin-bottom:10px;"><input type="checkbox" onchange="selezionaTuttiNote(this.checked)"> <b style="color:var(--accent-purple);">Tutta la classe</b></label>
+                <div id="noteCheckboxes" class="checkbox-grid"></div>
+
+                <select id="notaTipo" style="max-width: 220px;">
+                    <option value="Generica">📌 Nota Generica</option>
+                    <option value="Disciplinare">⚠️ Nota Disciplinare</option>
+                </select>
+                <input type="date" id="notaData" style="max-width: 220px;">
+                <textarea id="notaTesto" rows="2" placeholder="Motivazione della nota..."></textarea>
+                <button class="btn btn-danger" onclick="salvaNota()">Salva Nota</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead><tr><th>Data</th><th>Studente</th><th>Tipo</th><th>Motivazione</th><th>Azioni</th></tr></thead>
+                    <tbody id="tabellaNote"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="page-comunicazioni" class="page">
+            <h1>Comunicazioni</h1>
+            <div class="card">
+                <input type="text" id="comTitolo" placeholder="Titolo (es. Sciopero, Uscita Anticipata)">
+                <select id="comTarget" onchange="gestisciTargetComunicazione(this.value)" style="max-width: 220px;">
+                    <option value="Classe">Tutta la Classe</option>
+                    <option value="Solo Docente">Solo Docente</option>
+                    <option value="Singolo Studente">Singolo Studente</option>
+                    <option value="Più Studenti">Più Studenti</option>
+                </select>
+                <select id="comStudente" style="display:none; max-width: 220px;"></select>
+                <div id="comPiuStudenti" class="checkbox-grid" style="display:none; margin-top: 15px; margin-bottom: 15px;"></div>
+                <input type="date" id="comData" style="max-width: 220px;">
+                <textarea id="comTesto" rows="3" placeholder="Testo della comunicazione..."></textarea>
+                <button class="btn" onclick="salvaComunicazione()">Pubblica</button>
+            </div>
+            <div class="card">
+                <table><tbody id="tabellaComunicazioni"></tbody></table>
+            </div>
+        </div>
+
+        <div id="page-crea-pagella" class="page">
+            <h1>Compilazione Pagella</h1>
+            <div class="card" style="border-color: var(--accent-purple);">
+                <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <input type="text" id="pagellaTitolo" placeholder="Nome Pagella (Es. 1° Quadrimestre)" style="flex:1;" onchange="bozzaPagella.titolo = this.value">
+                    <button class="btn btn-danger btn-small" style="height: 42px;" onclick="resetBozzaPagella()">🔄 Azzera Bozza</button>
+                </div>
+                
+                <p style="color:var(--text-muted); margin-bottom: 15px;">Clicca su ogni materia per inserire i voti finali degli alunni della classe selezionata.</p>
+                <div id="grigliaMateriePagella" class="grid-materie"></div>
+                
+                <hr style="border-color: #262626; margin: 25px 0;">
+                <button class="btn btn-success" style="width: 100%; font-size: 16px;" onclick="apriRiepilogoPagella()">🏁 Vai al Riepilogo e Ammissioni</button>
+            </div>
+        </div>
+
+        <div id="page-compila-materia-pagella" class="page">
+            <h1 id="titoloCompilaMateriaPagella">Pagella: Materia</h1>
+            <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom: 20px;">
+                <button class="btn" style="background:#27272a; color:white;" onclick="cambiaPagina('crea-pagella')">⬅ Indietro</button>
+                <button class="btn" style="background:var(--accent-cyan); color:black; font-weight:bold;" onclick="importaVotiMediaMateria()">📊 Importa Voti Media</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead><tr><th>Studente</th><th>Media Attuale</th><th>Voto Finale in Pagella</th></tr></thead>
+                    <tbody id="corpoCompilaMateriaPagella"></tbody>
+                </table>
+                <button class="btn btn-success" style="width: 100%; margin-top: 15px; font-size: 16px;" onclick="salvaMateriaPagella()">💾 Salva e Torna alle Materie</button>
+            </div>
+        </div>
+
+        <div id="page-riepilogo-pagella" class="page">
+            <h1>Riepilogo Ammissioni</h1>
+            <button class="btn" style="background:#27272a; color:white; margin-bottom: 20px;" onclick="cambiaPagina('crea-pagella')">⬅ Torna alle Materie</button>
+            <div class="card">
+                <p style="margin-bottom:15px; color:var(--text-muted);">Spunta gli studenti <b>AMMESSI</b> all'anno successivo.</p>
+                <div id="listaAmmissioniPagella" class="checkbox-grid"></div>
+                <button class="btn btn-success" style="width: 100%; margin-top: 20px; font-size: 16px;" onclick="pubblicaPagellaDefinitiva()">💾 Pubblica Pagella Definitiva</button>
+            </div>
+        </div>
+
+        <div id="page-pagelle" class="page">
+            <h1>Archivio Pagelle</h1>
+            <div class="card" id="listaPagelleSalvate"></div>
+        </div>
+
+        <div id="page-dettaglio-pagella" class="page">
+            <button class="btn" style="background:#27272a; color:white; margin-bottom:20px;" onclick="cambiaPagina('pagelle', document.getElementById('btn-pagelle'))">⬅ Torna all'Archivio</button>
+            <h1 id="titoloPagellaAperta">Dettaglio Pagella</h1>
+            <input type="text" id="rinominaPagella" style="max-width: 300px; display:inline-block;" placeholder="Nuovo Nome">
+            <button class="btn" onclick="aggiornaNomePagella()">Rinomina</button>
+            
+            <div class="card" style="margin-top: 20px;">
+                <p style="color:var(--text-muted); margin-bottom:15px;">Clicca sul nome di uno studente per vedere tutti i suoi voti.</p>
+                <div id="corpoTabellaPagellaAperta" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+        </div>
+
+        <div id="page-voti-studente-pagella" class="page">
+            <button class="btn" style="background:#27272a; color:white; margin-bottom:20px;" onclick="cambiaPagina('dettaglio-pagella')">⬅ Torna alla Lista Alunni</button>
+            <h1 id="titoloVotiStudentePagella">Voti Studente</h1>
+            <div class="card">
+                <table>
+                    <thead><tr><th>Materia</th><th>Voto Finale</th></tr></thead>
+                    <tbody id="corpoVotiStudentePagella"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="page-config" class="page">
+            <h1>Impostazioni <button class="btn btn-danger" onclick="selezionaReset()" style="float:right;">⚠️ Svuota DB</button></h1>
+            
+            <div class="card">
+                <h3 style="color:var(--accent-purple); margin-bottom:15px;">Gestione Classi e Alunni</h3>
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="nuovaClasse" placeholder="Nuova Classe (es. 1A)" style="width:auto;">
+                    <button class="btn" onclick="aggiungiClasse()">Aggiungi Classe</button>
+                </div>
+                <div id="lista-classi" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 20px;"></div>
+
+                <div style="border-top:1px solid var(--border-color); padding-top:15px;">
+                    <span style="font-size:14px; color:var(--text-muted);">Aggiungi alunni alla classe: </span>
+                    <select id="config-sel-classe" onchange="caricaListaStudentiConfig()" style="width:auto;"></select>
+                    <br><br>
+                    <input type="text" id="nuovoStud" placeholder="Nome Studente" style="width:auto;">
+                    <button class="btn" onclick="aggiungiStudente()">Aggiungi Alunno</button>
+                    <div id="lista-stud-config" style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); padding:10px; border-radius:8px;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom:15px;">Gestione Materie Globali</h3>
+                <input type="text" id="nuovaMat" placeholder="Materia" style="width:auto;"><button class="btn" onclick="aggiungiMateria()">Aggiungi</button>
+                <div id="listaMat" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+            </div>
+
+            <div class="card" id="pannello-admin" style="display:none; border-color:var(--accent-cyan);">
+                <h3 style="color:var(--accent-cyan); margin-bottom:10px;">Gestione Insegnanti (Solo Admin)</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Gli insegnanti devono prima registrarsi dalla schermata di login. Dopo essersi registrati, l'Admin (tu) può cliccare qui sotto per assegnargli Classi e Materie specifiche.</p>
+                <button class="btn btn-success" onclick="editaPermessiInsegnante()">+ Autorizza / Modifica Permessi Insegnante</button>
+                <div id="lista-insegnanti" style="margin-top:15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalGiustifica" class="modal">
+        <div class="modal-content"><span class="close-modal" onclick="chiudiModal('modalGiustifica')">&times;</span>
+            <h3>Giustifica: <span id="nomeGiustifica" style="color:var(--accent-cyan)"></span></h3>
+            <div id="listaEventiDaGiustificare" style="margin: 15px 0; max-height: 200px; overflow-y: auto;"></div>
+            <div style="display:flex; gap:10px;"><button class="btn" style="flex:1;" onclick="giustificaSelezionati()">Selezionati</button><button class="btn btn-success" style="flex:1;" onclick="giustificaTutti()">Tutti</button></div>
+        </div>
+    </div>
+
+    <div id="modalDettaglioPresenze" class="modal">
+        <div class="modal-content" style="width: 400px;"><span class="close-modal" onclick="chiudiModal('modalDettaglioPresenze')">&times;</span>
+            <h3 id="titoloDettaglioPresenze" style="color: var(--accent-purple);">Dettaglio Eventi</h3>
+            <ul id="listaDettaglioPresenze" style="margin-top: 15px; list-style: none; line-height: 1.8; max-height: 300px; overflow-y: auto;"></ul>
+        </div>
+    </div>
+
+    <div id="modalDettaglioVoto" class="modal">
+        <div class="modal-content" style="width: 350px; text-align: center;"><span class="close-modal" onclick="chiudiModal('modalDettaglioVoto')">&times;</span>
+            <h3>Dettaglio Voto</h3>
+            <div id="infoDettaglioVoto" style="margin: 20px 0; font-size: 16px; line-height: 1.8;"></div>
+            <button id="btnModificaVoto" class="btn" style="width:100%; margin-bottom:10px; background:#fb923c;" onclick="editaVoto()">✏️ Modifica</button>
+            <button id="btnEliminaVoto" class="btn btn-danger" style="width:100%;" onclick="eliminaVoto()">🗑️ Elimina</button>
+        </div>
+    </div>
+
+    <div id="modalVotoSingolo" class="modal">
+        <div class="modal-content" style="width: 400px;"><span class="close-modal" onclick="chiudiModal('modalVotoSingolo')">&times;</span>
+            <h3>Voto a <span id="nomeStudenteVotoSingolo" style="color:var(--accent-cyan)"></span></h3>
+            <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="votoValSingolo" placeholder="Voto (es. 7.5, A, IMP)">
+                <input type="date" id="votoDataSingolo">
+                <select id="votoTipoSingolo"><option value="Orale">Orale</option><option value="Scritto">Scritto</option><option value="Pratico">Pratico</option></select>
+                <input type="text" id="votoCommentoSingolo" placeholder="Commento (opzionale)">
+                <label class="checkbox-item" style="margin-bottom: 10px;"><input type="checkbox" id="votoFaMediaSingolo" checked> <b>Fa Media</b></label>
+            </div>
+            <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="salvaVotoSingolo()">💾 Salva</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAZIONE FIREBASE CLOUD ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA9-5o_7GQmNosWQAWOI9CVnZxNTGOfld8",
+            authDomain: "registro-9db0e.firebaseapp.com",
+            databaseURL: "https://registro-9db0e-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "registro-9db0e",
+            storageBucket: "registro-9db0e.firebasestorage.app",
+            messagingSenderId: "961301993343",
+            appId: "1:961301993343:web:bf9623c907091ad2146c4a"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // --- SISTEMA DI LOGIN (Multi-Insegnante e Ricorda Password) ---
+        let currentUserEmail = "";
+        let utenteLoggato = null; // { nome, classi:[], materie:[], isAdmin }
+        
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                currentUserEmail = user.email;
+                document.getElementById('login-overlay').style.display = 'none';
+                if(db.classiAttive) applicaPermessi(); // Applica se DB è già carico
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
+            }
+        });
+
+        function effettuaLogin() {
+            let user = document.getElementById('login-username').value.trim();
+            let pass = document.getElementById('login-password').value;
+            let errorText = document.getElementById('login-error');
+            if(!user || !pass) return errorText.innerText = "⚠️ Inserisci credenziali.";
+            
+            let email = user.includes('@') ? user : user + "@registro.com";
+            let pers = document.getElementById('ricorda-pwd').checked ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
+            errorText.innerText = "Connessione in corso...";
+
+            firebase.auth().setPersistence(pers).then(() => {
+                return firebase.auth().signInWithEmailAndPassword(email, pass);
+            }).catch((error) => {
+                errorText.innerText = "❌ Errore: Credenziali errate.";
+            });
+        }
+
+        function effettuaRegistrazione() {
+            let user = document.getElementById('login-username').value.trim();
+            let pass = document.getElementById('login-password').value;
+            let errorText = document.getElementById('login-error');
+            if(!user || !pass) return errorText.innerText = "⚠️ Inserisci l'email o il nome utente e una password sicura prima di cliccare su Registrati.";
+            
+            let email = user.includes('@') ? user : user + "@registro.com";
+            errorText.innerText = "Registrazione in corso...";
+            
+            firebase.auth().createUserWithEmailAndPassword(email, pass).then(() => {
+                alert("Account Creato! Ora puoi accedere liberamente alle tue classi.");
+            }).catch((error) => {
+                errorText.innerText = "❌ Errore registrazione: " + error.message;
+            });
+        }
+
+        function effettuaLogout() { firebase.auth().signOut().then(() => location.reload()); }
+
+        // --- GESTIONE DATABASE E CLASSI ---
+        let db = { classiAttive: ["Classe Unica"], studentiPerClasse: {}, materie: [], presenze: {}, orariPresenza: {}, infoAppello: {}, giustificazioni: {}, voti: [], attivita: [], compiti: [], note: [], comunicazioni: [], pagelle: [], insegnanti: {} };
+        let paginaAttiva = 'dashboard';
+        let oggiStr = new Date().toISOString().split('T')[0];
+        let classeCorrente = "Classe Unica";
+
+        let studDaGiustificareCorrente = ""; let indiceVotoDaEliminare = -1;
+        let editIdxVoto = -1; let editIdxAtt = -1; let editIdxComp = -1; let editIdxNota = -1; let editIdxCom = -1;
+        let bozzaPagella = { titolo: '', voti: {}, ammessi: {} }; let materiaPagellaCorrente = '';
+        let isModalitaMultipla = false; let isModalitaClasse = false; let studCorrenteVotoSingolo = "";
+
+        database.ref('registroDati').on('value', (snapshot) => {
+            const datiCloud = snapshot.val();
+            if (datiCloud) {
+                db.classiAttive = datiCloud.classiAttive || ["Classe Unica"];
+                db.studentiPerClasse = datiCloud.studentiPerClasse || { "Classe Unica": (datiCloud.studenti || []) };
+                db.materie = datiCloud.materie || [];
+                db.presenze = datiCloud.presenze || {};
+                db.orariPresenza = datiCloud.orariPresenza || {};
+                db.infoAppello = datiCloud.infoAppello || {};
+                db.giustificazioni = datiCloud.giustificazioni || {};
+                db.insegnanti = datiCloud.insegnanti || {};
+                
+                // Fix di sicurezza Firebase: Garantisce che gli array non vengano trasformati in oggetti in caso di cancellazioni
+                db.voti = Array.isArray(datiCloud.voti) ? datiCloud.voti : Object.values(datiCloud.voti || {});
+                db.attivita = Array.isArray(datiCloud.attivita) ? datiCloud.attivita : Object.values(datiCloud.attivita || {});
+                db.compiti = Array.isArray(datiCloud.compiti) ? datiCloud.compiti : Object.values(datiCloud.compiti || {});
+                db.note = Array.isArray(datiCloud.note) ? datiCloud.note : Object.values(datiCloud.note || {});
+                db.comunicazioni = Array.isArray(datiCloud.comunicazioni) ? datiCloud.comunicazioni : Object.values(datiCloud.comunicazioni || {});
+                db.pagelle = Array.isArray(datiCloud.pagelle) ? datiCloud.pagelle : Object.values(datiCloud.pagelle || {});
+                
+                for(let s in db.giustificazioni) if(!Array.isArray(db.giustificazioni[s])) db.giustificazioni[s] = Object.values(db.giustificazioni[s] || {});
+            } else {
+                salvaDB();
+            }
+
+            document.getElementById('sync-status').innerText = "✅ Cloud Sincronizzato";
+            document.getElementById('sync-status').classList.add('status-ok');
+            
+            if(currentUserEmail) applicaPermessi();
+        });
+
+        function applicaPermessi() {
+            if(!currentUserEmail) return;
+            let emailKey = currentUserEmail.replace(/\./g, ',');
+            let info = db.insegnanti[emailKey];
+
+            if(!info) {
+                // Sblocco automatico: chi non è specificamente limitato dal pannello, ha pieni poteri per non restare bloccato fuori
+                utenteLoggato = { nome: currentUserEmail, classi: [...(db.classiAttive || [])], materie: [...(db.materie || [])], isAdmin: true };
+            } else {
+                utenteLoggato = info; 
+                utenteLoggato.isAdmin = currentUserEmail.startsWith('admin') || info.isAdmin;
+            }
+
+            let sel = document.getElementById('selettore-classe');
+            if(sel) {
+                sel.innerHTML = utenteLoggato.classi.map(c => `<option value="${c}">${c}</option>`).join('');
+                if(utenteLoggato.classi.length > 0) {
+                    if(!utenteLoggato.classi.includes(classeCorrente)) classeCorrente = utenteLoggato.classi[0];
+                    sel.value = classeCorrente;
+                }
+            }
+            document.getElementById('pannello-admin').style.display = utenteLoggato.isAdmin ? 'block' : 'none';
+            aggiornaSchermataAttiva();
+        }
+
+        function salvaDB() {
+            document.getElementById('sync-status').innerText = "Caricamento... ⏳";
+            document.getElementById('sync-status').classList.remove('status-ok');
+            database.ref('registroDati').set(db);
+        }
+
+        function cambiaClasseCorrente(val) { classeCorrente = val; aggiornaSchermataAttiva(); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('nascosta'); document.getElementById('main-content').classList.toggle('allargato'); }
+        function chiudiModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('dataGlobale').value = oggiStr;
+            document.querySelectorAll('input[type="date"]').forEach(el => el.value = oggiStr);
+            if(window.innerWidth < 800) toggleSidebar(); 
+        });
+
+        function cambiaDataGlobale(val) { oggiStr = val; document.querySelectorAll('input[type="date"]').forEach(el => { if(el.id !== 'rinominaPagella') el.value = oggiStr; }); aggiornaSchermataAttiva(); }
+
+        function cambiaPagina(id, btn) {
+            paginaAttiva = id; isModalitaClasse = false;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            if(btn) { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+            document.getElementById('page-'+id).classList.add('active');
+            aggiornaSchermataAttiva();
+            if(window.innerWidth < 800 && btn) toggleSidebar();
+        }
+
+        function aggiornaSchermataAttiva() {
+            if(!classeCorrente && !utenteLoggato?.isAdmin) return;
+            if(paginaAttiva==='dashboard') caricaDashboard();
+            if(paginaAttiva==='presenze') caricaAppello();
+            if(paginaAttiva==='voti' || paginaAttiva==='dettaglio-voti') { if(paginaAttiva==='voti') caricaGrigliaVoti(); else apriMateriaVoti(window.materiaCorrente); }
+            if(paginaAttiva==='attivita' || paginaAttiva==='compiti') aggiornaSelectMaterie();
+            if(paginaAttiva==='note') caricaNote();
+            if(paginaAttiva==='comunicazioni') caricaComunicazioni();
+            if(paginaAttiva==='crea-pagella') caricaGrigliaMateriePagella();
+            if(paginaAttiva==='pagelle') caricaArchivioPagelle();
+            if(paginaAttiva==='config') caricaConfig();
+        }
+
+        function calcolaColore(voto, faMedia) {
+            if (voto === 'A') return 'voto-A';
+            if (voto === 'IMP') return 'voto-IMP';
+            if (faMedia === false) return 'voto-no-media';
+            let num = parseFloat(voto);
+            if (isNaN(num)) return 'voto-rosso';
+            return num >= 6 ? 'voto-verde' : 'voto-rosso';
+        }
+
+        function getEventiDaGiustificare(st) { let ev=[]; let giaG = Array.isArray(db.giustificazioni[st])?db.giustificazioni[st]:[]; for(let d in db.presenze){ let s=db.presenze[d][st]; if((s==='Assente'||s==='Ritardo'||s==='Uscito')&&!giaG.includes(d)) ev.push({data:d, stato:s}); } return ev.sort((a,b)=>new Date(b.data)-new Date(a.data)); }
+        function getStatisticheStudente(st) { let ass=0, rit=0, usc=0; for(let d in db.presenze){ if(db.presenze[d][st]==='Assente') ass++; if(db.presenze[d][st]==='Ritardo') rit++; if(db.presenze[d][st]==='Uscito') usc++; } return {assenze:ass, ritardi:rit, uscite:usc}; }
+
+        function caricaDashboard() {
+            let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            document.getElementById('dataGlobale').value = oggiStr;
+            document.getElementById('dash-data-oggi').innerText = oggiStr.split('-').reverse().join('/');
+            
+            let htmlStato = [];
+            if(db.presenze[oggiStr]) {
+                studentiClasse.forEach(st => {
+                    let s = db.presenze[oggiStr][st];
+                    if(s && s !== 'Presente') {
+                        let ore = (db.orariPresenza && db.orariPresenza[oggiStr] && db.orariPresenza[oggiStr][st]) ? ` (${db.orariPresenza[oggiStr][st]})` : '';
+                        if(s==='Assente') htmlStato.push(`<li><span style="color:var(--t-assente);font-weight:bold;">🔴 Assente: ${st}</span></li>`); 
+                        else if(s==='Uscito') htmlStato.push(`<li><span style="color:var(--t-uscito);font-weight:bold;">🔵 Uscito: ${st}</span>${ore}</li>`); 
+                        else if(s==='Ritardo') htmlStato.push(`<li><span style="color:var(--t-ritardo);font-weight:bold;">🟠 Ritardo: ${st}</span>${ore}</li>`);
+                    }
+                });
+            }
+            document.getElementById('dash-assenti').innerHTML = htmlStato.length ? htmlStato.join('') : '<li style="color:var(--text-muted);">Tutti presenti.</li>';
+            
+            let materieVisibili = utenteLoggato?.isAdmin ? db.materie : utenteLoggato?.materie || [];
+            let c = db.compiti.filter(x=>x.data===oggiStr && materieVisibili.includes(x.materia)); document.getElementById('dash-compiti').innerHTML = c.length ? c.map(x=>`<li><b>${x.materia}:</b> ${x.testo}</li>`).join('') : '<li>Nessun compito oggi.</li>';
+            let att = db.attivita.filter(x=>x.data===oggiStr && materieVisibili.includes(x.materia)); document.getElementById('dash-attivita').innerHTML = att.length ? att.map(x=>`<li><b>${x.materia}:</b> ${x.testo}</li>`).join('') : '<li>Nessuna attività registrata.</li>';
+            
+            let hGiust = []; studentiClasse.forEach(st=>{ let ev=getEventiDaGiustificare(st); if(ev.length>0) hGiust.push(`<li><span style="color:#fb923c;">⚠️ <b>${st}</b>: ${ev.length} eventi da giust.</span></li>`); });
+            document.getElementById('dash-giustificazioni').innerHTML = hGiust.length ? hGiust.join('') : '<li style="color:#10b981;">Tutto giustificato.</li>';
+            
+            let coms = [...db.comunicazioni].filter(c => c.classe === classeCorrente || !c.classe).sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,3); 
+            document.getElementById('dash-comunicazioni').innerHTML = coms.length ? coms.map(x=>`<b>${x.titolo}</b> (${x.data})<br><span style="font-size:12px;">${x.testo}</span><br>`).join('<hr style="border-color:#262626; margin:5px 0;">') : 'Nessuna comunicazione.';
+        }
+
+        // --- GESTIONE IMPOSTAZIONI, CLASSI E INSEGNANTI ---
+        function caricaConfig() {
+            document.getElementById('lista-classi').innerHTML = db.classiAttive.map(c => `<span class="voto-item" style="background:#1c1c1f;">${c} <b onclick="if(confirm('Rimuovere classe? I dati resteranno orfani.')) { db.classiAttive.splice(db.classiAttive.indexOf('${c}'),1); salvaDB(); caricaConfig(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join('');
+            
+            let selC = document.getElementById('config-sel-classe');
+            if(selC) { selC.innerHTML = db.classiAttive.map(c => `<option value="${c}">${c}</option>`).join(''); caricaListaStudentiConfig(); }
+
+            document.getElementById('listaMat').innerHTML = db.materie.map((m,i) => `<span class="voto-item" style="background:#1c1c1f;">${m} <b onclick="if(confirm('Rimuovere materia?')) { db.materie.splice(${i},1); salvaDB(); caricaConfig(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join(''); 
+
+            if(utenteLoggato && utenteLoggato.isAdmin) {
+                let htmlIns = '';
+                for(let key in db.insegnanti) {
+                    let ins = db.insegnanti[key];
+                    htmlIns += `<div style="background:#18181b; padding:10px; border-radius:6px; margin-bottom:10px; border:1px solid var(--border-color);">
+                        <b style="color:var(--accent-cyan); font-size:16px;">${key.replace(/,/g, '.')}</b> <button class="btn-cestino" style="color:#ef4444; float:right;" onclick="if(confirm('Eliminare insegnante?')) { delete db.insegnanti['${key}']; salvaDB(); caricaConfig(); }">🗑️</button><br>
+                        <span style="font-size:13px; color:var(--text-muted);">Classi asseganate: ${ins.classi.join(', ') || 'Nessuna'} <br> Materie assegnate: ${ins.materie.join(', ') || 'Nessuna'}</span>
+                    </div>`;
+                }
+                document.getElementById('lista-insegnanti').innerHTML = htmlIns || '<p style="color:var(--text-muted); font-size:13px;">Nessun insegnante configurato.</p>';
+            }
+        }
+
+        function aggiungiClasse() { let c = document.getElementById('nuovaClasse').value.trim().toUpperCase(); if(c && !db.classiAttive.includes(c)) { db.classiAttive.push(c); db.studentiPerClasse[c] = []; salvaDB(); document.getElementById('nuovaClasse').value=''; caricaConfig(); applicaPermessi(); } }
+        function aggiungiStudente() { let c = document.getElementById('config-sel-classe').value; let s = document.getElementById('nuovoStud').value.trim(); if(c && s && !db.studentiPerClasse[c].includes(s)) { db.studentiPerClasse[c].push(s); db.studentiPerClasse[c].sort(); salvaDB(); document.getElementById('nuovoStud').value=''; caricaListaStudentiConfig(); } }
+        function caricaListaStudentiConfig() { let c = document.getElementById('config-sel-classe').value; if(!c) return; document.getElementById('lista-stud-config').innerHTML = (db.studentiPerClasse[c]||[]).map((s,i) => `<span class="voto-item" style="background:#1c1c1f;">${s} <b onclick="if(confirm('Rimuovere studente?')) { db.studentiPerClasse['${c}'].splice(${i},1); salvaDB(); caricaListaStudentiConfig(); }" style="color:#ef4444; margin-left:5px;">X</b></span>`).join(''); }
+        function aggiungiMateria() { let v = document.getElementById('nuovaMat').value.trim(); if(v && !db.materie.includes(v)) { db.materie.push(v); db.materie.sort(); salvaDB(); document.getElementById('nuovaMat').value=''; caricaConfig(); } }
+        function selezionaReset() { if(confirm("Sei sicuro? Cancellerai tutti i dati nel Cloud in modo definitivo!")) { database.ref('registroDati').remove().then(() => location.reload()); } }
+
+        function editaPermessiInsegnante() {
+            let emailRaw = prompt("Email dell'insegnante (es. prof@registro.com):");
+            if(!emailRaw) return;
+            let emailKey = emailRaw.replace(/\./g, ',');
+            
+            let classiRaw = prompt("Inserisci le CLASSI a cui è assegnato, separate da virgola (es. 1A, 2B)\nOppure digita * per TUTTE le classi:");
+            if(classiRaw === null) return;
+            let materieRaw = prompt("Inserisci le MATERIE, separate da virgola (es. Matematica, Storia)\nOppure digita * per TUTTE le materie:");
+            if(materieRaw === null) return;
+
+            let classi = classiRaw.trim() === '*' ? db.classiAttive : classiRaw.split(',').map(x=>x.trim().toUpperCase()).filter(x=>x);
+            let materie = materieRaw.trim() === '*' ? db.materie : materieRaw.split(',').map(x=>x.trim()).filter(x=>x);
+
+            db.insegnanti[emailKey] = { classi: classi, materie: materie };
+            salvaDB(); alert("Permessi salvati!"); caricaConfig();
+        }
+
+        // --- RESTO DEL CODICE ADATTATO ALLA CLASSE CORRENTE ---
+        function caricaAppello() {
+            let d = document.getElementById('dataAppello').value; let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            if(!db.infoAppello[d]) db.infoAppello[d] = {inizio: '', fine: ''};
+            document.getElementById('oraInizioAppello').value = db.infoAppello[d].inizio || ''; document.getElementById('oraFineAppello').value = db.infoAppello[d].fine || '';
+
+            let tb = document.getElementById('tabellaPresenze'); tb.innerHTML=''; if(!db.presenze[d]) db.presenze[d]={}; if(!db.orariPresenza) db.orariPresenza={};
+
+            studentiClasse.forEach(st => {
+                let s = db.presenze[d][st] || "Presente"; 
+                let col="var(--text-light)"; if(s==='Assente') col="var(--t-assente)"; if(s==='Ritardo') col="var(--t-ritardo)"; if(s==='Uscito') col="var(--t-uscito)"; if(s==='Presente') col="var(--t-presente)";
+                
+                let stats = getStatisticheStudente(st); let evG = getEventiDaGiustificare(st);
+                let btnG = evG.length>0 ? `<button class="btn btn-small" style="background:#fb923c; color:black; margin-top:5px;" onclick="apriModalGiustifica('${st}')">⚠️ Giustifica (${evG.length})</button>` : `<span style="font-size:12px; color:#10b981; display:block; margin-top:5px;">✅ Tutto giustificato</span>`;
+                
+                let statAssenze = `<b class="click-stats" style="cursor:pointer; text-decoration:underline; transition:0.2s; color:var(--text-light);" onclick="apriDettaglioPresenze('${st}', 'Assente')">${stats.assenze}</b>`;
+                let statRitardi = `<b class="click-stats" style="cursor:pointer; text-decoration:underline; transition:0.2s; color:var(--text-light);" onclick="apriDettaglioPresenze('${st}', 'Ritardo')">${stats.ritardi}</b>`;
+                let statUscite = `<b class="click-stats" style="cursor:pointer; text-decoration:underline; transition:0.2s; color:var(--text-light);" onclick="apriDettaglioPresenze('${st}', 'Uscito')">${stats.uscite}</b>`;
+
+                let valOra = (db.orariPresenza[d] && db.orariPresenza[d][st]) ? db.orariPresenza[d][st] : '';
+                let displayOra = (s === 'Ritardo' || s === 'Uscito') ? 'inline-block' : 'none';
+                let inputOrario = `<input type="time" id="ora_presenza_${st}" value="${valOra}" onchange="impostaOraPresenza('${d}', '${st}', this.value)" style="display:${displayOra}; width:auto; padding:5px; margin-left:10px; border-radius:4px; background:#1c1c1f; border:1px solid var(--border-color); color:white;"> <button id="btn_ora_presenza_${st}" class="btn-small" style="display:${displayOra}; margin-left:5px; background:var(--accent-purple); color:white; border:none; border-radius:4px; cursor:pointer;" onclick="impostaOraAttualeStudente('${d}', '${st}')">🕒</button>`;
+
+                tb.innerHTML += `<tr class="row-${s}" style="color:${col};"><td><b style="font-size:15px; color:var(--accent-cyan);">${st}</b><div class="stats-details">Assenze: ${statAssenze} | Ritardi: ${statRitardi} | Uscite: ${statUscite}</div>${btnG}</td><td><select class="select-stato" id="stato_${st}" style="color:${col};" onchange="impostaPresenza('${d}', '${st}', this.value)"><option value="Presente" ${s==='Presente'?'selected':''} style="color:var(--t-presente);">Presente</option><option value="Assente" ${s==='Assente'?'selected':''} style="color:var(--t-assente);">Assente</option><option value="Ritardo" ${s==='Ritardo'?'selected':''} style="color:var(--t-ritardo);">Ritardo</option><option value="Uscito" ${s==='Uscito'?'selected':''} style="color:var(--t-uscito);">Uscito Prima</option></select>${inputOrario}</td></tr>`;
+            });
+        }
+        function salvaInfoAppello() { let d = document.getElementById('dataAppello').value; if(!db.infoAppello[d]) db.infoAppello[d] = {}; db.infoAppello[d].inizio = document.getElementById('oraInizioAppello').value; db.infoAppello[d].fine = document.getElementById('oraFineAppello').value; salvaDB(); }
+        function impostaOraAttualeAppello() { let now = new Date(); let timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0'); if(!document.getElementById('oraInizioAppello').value) document.getElementById('oraInizioAppello').value = timeStr; else document.getElementById('oraFineAppello').value = timeStr; salvaInfoAppello(); }
+        function impostaPresenza(d,st,v) { if(!db.presenze[d]) db.presenze[d]={}; db.presenze[d][st]=v; if (v === 'Presente' || v === 'Assente') { if (db.orariPresenza && db.orariPresenza[d] && db.orariPresenza[d][st]) delete db.orariPresenza[d][st]; } salvaDB(); caricaAppello(); }
+        function impostaOraPresenza(d, st, val) { if(!db.orariPresenza[d]) db.orariPresenza[d] = {}; db.orariPresenza[d][st] = val; salvaDB(); }
+        function impostaOraAttualeStudente(d, st) { let now = new Date(); let timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0'); document.getElementById(`ora_presenza_${st}`).value = timeStr; impostaOraPresenza(d, st, timeStr); }
+        function salvaPresenzeConAvviso() { let d=document.getElementById('dataAppello').value, ass=[]; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; studentiClasse.forEach(s=>{ let e=document.getElementById(`stato_${s}`); if(e&&e.value==='Assente') ass.push(s); }); salvaDB(); alert(ass.length>0?"Salvate!\nAssenti:\n- "+ass.join("\n- "):"Salvate!\nTutti presenti."); }
+        function apriDettaglioPresenze(st, tipo) { document.getElementById('titoloDettaglioPresenze').innerText = `Storico ${tipo}: ${st}`; let listHtml = []; for(let d in db.presenze) { if(db.presenze[d][st] === tipo) { let ore = (db.orariPresenza && db.orariPresenza[d] && db.orariPresenza[d][st]) ? ` <span style="color:var(--text-light);">(Ore: ${db.orariPresenza[d][st]})</span>` : ''; let colTipo = (tipo === 'Assente') ? 'var(--t-assente)' : (tipo === 'Ritardo') ? 'var(--t-ritardo)' : 'var(--t-uscito)'; listHtml.push({ dataIso: d, html: `<li style="padding: 8px; border-bottom: 1px solid var(--border-color);"><b>${d.split('-').reverse().join('/')}</b> - <span style="color:${colTipo}; font-weight:bold;">${tipo}</span>${ore}</li>` }); } } listHtml.sort((a,b) => new Date(b.dataIso) - new Date(a.dataIso)); document.getElementById('listaDettaglioPresenze').innerHTML = listHtml.length ? listHtml.map(x=>x.html).join('') : '<li style="padding: 8px;">Nessun evento.</li>'; document.getElementById('modalDettaglioPresenze').classList.add('active'); }
+        function apriModalGiustifica(st) { studDaGiustificareCorrente=st; document.getElementById('nomeGiustifica').innerText=st; let ev=getEventiDaGiustificare(st); document.getElementById('listaEventiDaGiustificare').innerHTML=ev.map(e=>`<label class="checkbox-item" style="padding:8px; border-bottom:1px solid var(--border-color);"><input type="checkbox" class="check-giustifica" value="${e.data}"> <b>${e.data.split('-').reverse().join('/')}</b> - <span style="color:#f87171">${e.stato}</span></label>`).join(''); document.getElementById('modalGiustifica').classList.add('active'); }
+        function giustificaSelezionati() { let c=document.querySelectorAll('.check-giustifica:checked'); if(c.length===0) return alert("Seleziona evento."); if(!Array.isArray(db.giustificazioni[studDaGiustificareCorrente])) db.giustificazioni[studDaGiustificareCorrente]=[]; c.forEach(x=>db.giustificazioni[studDaGiustificareCorrente].push(x.value)); salvaDB(); chiudiModal('modalGiustifica'); caricaAppello(); }
+        function giustificaTutti() { let ev=getEventiDaGiustificare(studDaGiustificareCorrente); if(!Array.isArray(db.giustificazioni[studDaGiustificareCorrente])) db.giustificazioni[studDaGiustificareCorrente]=[]; ev.forEach(x=>db.giustificazioni[studDaGiustificareCorrente].push(x.data)); salvaDB(); chiudiModal('modalGiustifica'); caricaAppello(); }
+
+        function caricaGrigliaVoti() { let materieVisibili = utenteLoggato?.isAdmin ? db.materie : utenteLoggato?.materie || []; document.getElementById('grigliaMaterieVoti').innerHTML = materieVisibili.map(m => `<div class="card-materia" onclick="apriMateriaVoti('${m}')">${m}</div>`).join('') || '<p style="color:var(--text-muted)">Nessuna materia assegnata.</p>'; }
+        
+        function apriMateriaVoti(m) {
+            if(!m) return; window.materiaCorrente = m; document.getElementById('titoloMateriaVoti').innerText = "Voti: " + m;
+            let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            if(!isModalitaClasse) {
+                document.getElementById('panel-voti-classe').style.display = 'none'; document.getElementById('btn-voti-classe').style.display = 'inline-block'; document.getElementById('btn-toggle-multiplo').style.display = 'inline-block'; disattivaVotoMultiplo();
+                let tb = document.getElementById('corpoTabellaVoti'); tb.innerHTML = ''; document.getElementById('thead-voti-row').innerHTML = `<th class="col-check-multiplo" style="display:none; width:40px;">Sel.</th><th>Studente</th><th>Voti</th><th>Media</th>`;
+                let votiGlobali = db.voti.map((v, i) => ({...v, globalIdx: i}));
+                studentiClasse.forEach(s => {
+                    let votiStud = votiGlobali.filter(v => v.materia === m && v.studente === s);
+                    let htmlVoti = votiStud.map(v => `<span class="voto-item ${calcolaColore(v.voto, v.faMedia)}" onclick="event.stopPropagation(); apriDettaglioVoto(${v.globalIdx})">${v.voto}</span>`).join(' ');
+                    let votiValidiMedia = votiStud.filter(v => v.faMedia !== false && !isNaN(parseFloat(v.voto)));
+                    let media = votiValidiMedia.length ? (votiValidiMedia.reduce((acc, c) => acc + parseFloat(c.voto), 0) / votiValidiMedia.length).toFixed(2) : '-';
+                    let isAssente = db.presenze[oggiStr] && db.presenze[oggiStr][s] === 'Assente';
+                    tb.innerHTML += `<tr class="stud-row-voto" style="cursor:pointer; transition:0.2s;" onclick="gestisciClickRigaVoti(this, '${s}')"><td class="col-check-multiplo" style="display:none;" onclick="event.stopPropagation()"><input type="checkbox" class="check-stud-multiplo" value="${s}"></td><td><span ${isAssente ? `onclick="event.stopPropagation(); alert('${s} oggi è assente.');"` : ''}><b style="${isAssente ? 'color:#ef4444;' : 'color:var(--accent-cyan);'} font-size:15px; text-decoration:underline; text-underline-offset:3px;">${s}</b></span></td><td>${htmlVoti||'-'}</td><td class="${media!=='-'?calcolaColore(media, true):''}"><b>${media}</b></td></tr>`;
+                });
+            } else { rirenderizzaTabellaPerClasse(); }
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById('page-dettaglio-voti').classList.add('active'); paginaAttiva = 'dettaglio-voti';
+        }
+
+        function attivaVotoMultiplo() { isModalitaMultipla = true; isModalitaClasse = false; document.getElementById('panel-voti-classe').style.display = 'none'; document.getElementById('btn-voti-classe').style.display = 'none'; document.getElementById('panel-voto-multiplo').style.display = 'block'; document.getElementById('btn-toggle-multiplo').style.display = 'none'; document.querySelectorAll('.col-check-multiplo').forEach(el => el.style.display = 'table-cell'); document.getElementById('votoDataMultiplo').value = oggiStr; }
+        function disattivaVotoMultiplo() { isModalitaMultipla = false; document.getElementById('panel-voto-multiplo').style.display = 'none'; document.getElementById('btn-toggle-multiplo').style.display = 'inline-block'; document.querySelectorAll('.col-check-multiplo').forEach(el => el.style.display = 'none'); document.querySelectorAll('.check-stud-multiplo').forEach(cb => cb.checked = false); document.getElementById('votoValMultiplo').value = ''; document.getElementById('votoCommentoMultiplo').value = ''; }
+        function attivaVotiClasse() { isModalitaClasse = true; disattivaVotoMultiplo(); document.getElementById('panel-voti-classe').style.display = 'block'; document.getElementById('btn-voti-classe').style.display = 'none'; document.getElementById('btn-toggle-multiplo').style.display = 'none'; document.getElementById('votoDataClasse').value = oggiStr; rirenderizzaTabellaPerClasse(); }
+        function disattivaVotiClasse() { isModalitaClasse = false; document.getElementById('panel-voti-classe').style.display = 'none'; document.getElementById('btn-voti-classe').style.display = 'inline-block'; document.getElementById('btn-toggle-multiplo').style.display = 'inline-block'; document.getElementById('votoCommentoClasse').value = ''; apriMateriaVoti(window.materiaCorrente); }
+
+        function aggiornaAutoAssentiClasse() { if (!isModalitaClasse) return; let d = document.getElementById('votoDataClasse').value; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; studentiClasse.forEach(s => { let inputVoto = document.getElementById(`voto_classe_${s}`); if (inputVoto) { if (db.presenze[d] && db.presenze[d][s] === 'Assente') inputVoto.value = 'A'; else if (inputVoto.value === 'A') inputVoto.value = ''; } }); }
+
+        function rirenderizzaTabellaPerClasse() {
+            let m = window.materiaCorrente; let tb = document.getElementById('corpoTabellaVoti'); tb.innerHTML = ''; document.getElementById('thead-voti-row').innerHTML = `<th>Studente</th><th>Voto da inserire (num, A, IMP)</th><th>Voti Esistenti</th>`; let d = document.getElementById('votoDataClasse').value; let votiGlobali = db.voti.map((v, i) => ({...v, globalIdx: i})); let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            studentiClasse.forEach(s => {
+                let votiStud = votiGlobali.filter(v => v.materia === m && v.studente === s); let htmlVoti = votiStud.map(v => `<span class="voto-item ${calcolaColore(v.voto, v.faMedia)}">${v.voto}</span>`).join(' '); let isAssente = db.presenze[d] && db.presenze[d][s] === 'Assente';
+                tb.innerHTML += `<tr><td><b style="color:var(--accent-cyan); font-size:15px;">${s}</b> ${isAssente ? '<span style="color:#ef4444; font-size:12px; font-weight:bold;">(Assente)</span>' : ''}</td><td><input type="text" id="voto_classe_${s}" value="${isAssente ? 'A' : ''}" placeholder="Inserisci Voto" style="width:140px; margin:0; font-weight:bold;"></td><td>${htmlVoti||'-'}</td></tr>`;
+            });
+        }
+
+        function salvaVotiClasse() {
+            let d = document.getElementById('votoDataClasse').value; let t = document.getElementById('votoTipoClasse').value; let c = document.getElementById('votoCommentoClasse').value; let faMedia = document.getElementById('votoFaMediaClasse').checked; let inseriti = 0; let erroreVoto = false; let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            studentiClasse.forEach(s => {
+                let inputElement = document.getElementById(`voto_classe_${s}`); if (inputElement) { let v = inputElement.value.trim(); if (v !== '') { if (!isNaN(parseFloat(v)) && parseFloat(v) > 10) erroreVoto = true; else { db.voti.push({studente: s, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia}); inseriti++; } } }
+            });
+            if (erroreVoto) alert("Attenzione: alcuni voti non sono stati salvati perché superiori a 10!");
+            if (inseriti > 0) { salvaDB(); alert(`Salvati correttamente ${inseriti} voti.`); } else if (!erroreVoto) alert("Nessun voto inserito.");
+            disattivaVotiClasse();
+        }
+
+        function gestisciClickRigaVoti(riga, stud) { if (isModalitaClasse) return; if (isModalitaMultipla) { let cb = riga.querySelector('.check-stud-multiplo'); cb.checked = !cb.checked; } else { studCorrenteVotoSingolo = stud; document.getElementById('nomeStudenteVotoSingolo').innerText = stud; document.getElementById('votoValSingolo').value = ''; document.getElementById('votoCommentoSingolo').value = ''; document.getElementById('votoDataSingolo').value = oggiStr; document.getElementById('modalVotoSingolo').classList.add('active'); } }
+        function salvaVotoSingolo() { let v = document.getElementById('votoValSingolo').value.trim(); let d = document.getElementById('votoDataSingolo').value; let t = document.getElementById('votoTipoSingolo').value; let c = document.getElementById('votoCommentoSingolo').value; let faMedia = document.getElementById('votoFaMediaSingolo').checked; if(!v) return alert("Inserisci un voto!"); if(!isNaN(parseFloat(v)) && parseFloat(v) > 10) return alert("Il voto non può essere superiore a 10!"); if(editIdxVoto >= 0) { db.voti[editIdxVoto] = {studente: studCorrenteVotoSingolo, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia}; editIdxVoto = -1; } else { db.voti.push({studente: studCorrenteVotoSingolo, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia}); } salvaDB(); chiudiModal('modalVotoSingolo'); apriMateriaVoti(window.materiaCorrente); }
+        function editaVoto() { let v = db.voti[indiceVotoDaEliminare]; editIdxVoto = indiceVotoDaEliminare; studCorrenteVotoSingolo = v.studente; document.getElementById('nomeStudenteVotoSingolo').innerText = v.studente + " (Modifica)"; document.getElementById('votoValSingolo').value = v.voto; document.getElementById('votoDataSingolo').value = v.data; document.getElementById('votoTipoSingolo').value = v.tipo; document.getElementById('votoFaMediaSingolo').checked = v.faMedia !== false; document.getElementById('votoCommentoSingolo').value = v.commento || ''; chiudiModal('modalDettaglioVoto'); document.getElementById('modalVotoSingolo').classList.add('active'); }
+        function salvaVotoMultiplo() { let v = document.getElementById('votoValMultiplo').value.trim(); let d = document.getElementById('votoDataMultiplo').value; let t = document.getElementById('votoTipoMultiplo').value; let c = document.getElementById('votoCommentoMultiplo').value; let faMedia = document.getElementById('votoFaMediaMultiplo').checked; let selezionati = Array.from(document.querySelectorAll('.check-stud-multiplo:checked')).map(cb => cb.value); if(selezionati.length === 0) return alert("Seleziona almeno uno studente!"); if(!v) return alert("Inserisci un voto!"); if(!isNaN(parseFloat(v)) && parseFloat(v) > 10) return alert("Il voto non può essere superiore a 10!"); selezionati.forEach(s => { db.voti.push({studente: s, materia: window.materiaCorrente, voto: v, data: d, tipo: t, commento: c, faMedia: faMedia}); }); salvaDB(); disattivaVotoMultiplo(); apriMateriaVoti(window.materiaCorrente); }
+        function apriDettaglioVoto(idx) { let v = db.voti[idx]; indiceVotoDaEliminare = idx; let coloreTesto = (v.voto === 'A') ? '#ef4444' : (v.voto === 'IMP') ? '#3b82f6' : (parseFloat(v.voto) >= 6 ? 'var(--voto-suff)' : 'var(--voto-insuff)'); document.getElementById('infoDettaglioVoto').innerHTML = `<b>Studente:</b> ${v.studente}<br><b>Voto:</b> <span style="font-size: 24px; font-weight: bold; color: ${coloreTesto};">${v.voto}</span><br><b>Data:</b> ${v.data.split('-').reverse().join('/')}<br><b>Tipo:</b> ${v.tipo}<br><b>Fa Media:</b> ${v.faMedia===false?'<span style="color:#f87171">No</span>':'<span style="color:#4ade80">Sì</span>'}<br><b>Commento:</b> ${v.commento || '-'}`; document.getElementById('modalDettaglioVoto').classList.add('active'); }
+        function eliminaVoto() { if(confirm("Eliminare questo voto?")) { db.voti.splice(indiceVotoDaEliminare, 1); salvaDB(); chiudiModal('modalDettaglioVoto'); apriMateriaVoti(window.materiaCorrente); } }
+
+        function caricaNote() { 
+            let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            document.getElementById('noteCheckboxes').innerHTML = studentiClasse.map(s => `<label class="checkbox-item"><input type="checkbox" class="check-nota-stud" value="${s}"> ${s}</label>`).join(''); 
+            let tb = document.getElementById('tabellaNote'); tb.innerHTML = ''; 
+            db.note.map((n,i)=>({...n, idx:i})).filter(n => studentiClasse.includes(n.studente)).sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((n) => { 
+                tb.innerHTML += `<tr><td>${n.data.split('-').reverse().join('/')}</td><td><b>${n.studente}</b></td><td>${n.tipo}</td><td>${n.testo}</td><td><button class="btn-cestino" onclick="preparaModificaNota(${n.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare nota?')) { db.note.splice(${n.idx},1); salvaDB(); caricaNote(); }">🗑️</button></td></tr>`; 
+            }); 
+        }
+        function preparaModificaNota(idx) { let n = db.note[idx]; editIdxNota = idx; document.querySelectorAll('.check-nota-stud').forEach(cb => cb.checked = (cb.value === n.studente)); document.getElementById('notaTipo').value = n.tipo; document.getElementById('notaData').value = n.data; document.getElementById('notaTesto').value = n.testo; document.querySelector('#page-note .btn-danger').innerText = "Aggiorna Nota"; }
+        function selezionaTuttiNote(checked) { document.querySelectorAll('.check-nota-stud').forEach(cb => cb.checked = checked); }
+        function salvaNota() { let t = document.getElementById('notaTesto').value; let sel = Array.from(document.querySelectorAll('.check-nota-stud:checked')).map(cb => cb.value); if(sel.length===0) return alert("Seleziona studente!"); if(!t) return alert("Motivazione mancante."); let d = document.getElementById('notaData').value, tip = document.getElementById('notaTipo').value; if(editIdxNota >= 0) { db.note[editIdxNota] = {studente: sel[0], tipo: tip, data: d, testo: t}; editIdxNota = -1; document.querySelector('#page-note .btn-danger').innerText = "Salva Nota"; } else { sel.forEach(s => db.note.push({studente: s, tipo: tip, data: d, testo: t})); } salvaDB(); caricaNote(); document.getElementById('notaTesto').value=''; }
+        
+        function gestisciTargetComunicazione(val) { document.getElementById('comStudente').style.display = val === 'Singolo Studente' ? 'inline-block' : 'none'; document.getElementById('comPiuStudenti').style.display = val === 'Più Studenti' ? 'grid' : 'none'; }
+        function caricaComunicazioni() { 
+            let tb = document.getElementById('tabellaComunicazioni'); tb.innerHTML = ''; let studentiClasse = db.studentiPerClasse[classeCorrente] || [];
+            document.getElementById('comStudente').innerHTML = studentiClasse.map(s => `<option value="${s}">${s}</option>`).join('');
+            document.getElementById('comPiuStudenti').innerHTML = studentiClasse.map(s => `<label class="checkbox-item"><input type="checkbox" class="check-com-stud" value="${s}"> ${s}</label>`).join('');
+            db.comunicazioni.map((c,i)=>({...c, idx:i})).filter(c => c.classe === classeCorrente || !c.classe).sort((a,b)=> new Date(b.data) - new Date(a.data)).forEach((c) => { 
+                tb.innerHTML += `<tr><td><b>${c.data.split('-').reverse().join('/')}</b><br><span style="color:var(--accent-purple);">${c.titolo}</span><br><span style="font-size:12px; color:var(--accent-cyan);">Destinatario: ${c.target || 'Classe'}</span><br><span style="font-size:13px; color:var(--text-muted);">${c.testo}</span></td><td><button class="btn-cestino" onclick="preparaModificaComunicazione(${c.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.comunicazioni.splice(${c.idx},1); salvaDB(); caricaComunicazioni();}">🗑️</button></td></tr>`; 
+            }); 
+        }
+        function preparaModificaComunicazione(idx) { let c = db.comunicazioni[idx]; editIdxCom = idx; document.getElementById('comTitolo').value = c.titolo; document.getElementById('comData').value = c.data; document.getElementById('comTesto').value = c.testo; let tgt = c.target || 'Classe'; if(tgt.startsWith('Alunno: ')) { document.getElementById('comTarget').value = 'Singolo Studente'; gestisciTargetComunicazione('Singolo Studente'); document.getElementById('comStudente').value = tgt.replace('Alunno: ', ''); } else if (tgt.startsWith('Alunni: ')) { document.getElementById('comTarget').value = 'Più Studenti'; gestisciTargetComunicazione('Più Studenti'); let studList = tgt.replace('Alunni: ', '').split(', '); document.querySelectorAll('.check-com-stud').forEach(cb => { cb.checked = studList.includes(cb.value); }); } else { document.getElementById('comTarget').value = tgt; gestisciTargetComunicazione(tgt); } document.querySelector('#page-comunicazioni .btn').innerText = "Aggiorna"; }
+        function salvaComunicazione() { let t = document.getElementById('comTitolo').value, txt = document.getElementById('comTesto').value; if(!t||!txt) return; let target = document.getElementById('comTarget').value; if(target === 'Singolo Studente') { target = "Alunno: " + document.getElementById('comStudente').value; } else if (target === 'Più Studenti') { let sel = Array.from(document.querySelectorAll('.check-com-stud:checked')).map(cb => cb.value); if(sel.length === 0) return alert("Seleziona almeno uno studente!"); target = "Alunni: " + sel.join(', '); } if(editIdxCom >= 0) { db.comunicazioni[editIdxCom] = {titolo:t, data:document.getElementById('comData').value, testo:txt, target: target, classe: classeCorrente}; editIdxCom = -1; document.querySelector('#page-comunicazioni .btn').innerText = "Pubblica"; } else { db.comunicazioni.push({titolo:t, data:document.getElementById('comData').value, testo:txt, target: target, classe: classeCorrente}); } salvaDB(); caricaComunicazioni(); document.getElementById('comTitolo').value=''; document.getElementById('comTesto').value=''; document.getElementById('comTarget').value='Classe'; gestisciTargetComunicazione('Classe'); document.querySelectorAll('.check-com-stud').forEach(cb => cb.checked=false); }
+        
+        function aggiornaSelectMaterie() { let materieVisibili = utenteLoggato?.isAdmin ? db.materie : utenteLoggato?.materie || []; let mHtml = materieVisibili.map(m => `<option value="${m}">${m}</option>`).join(''); ['attivitaMateria', 'filtroAttivita', 'compitiMateria', 'filtroCompiti'].forEach(id => { let el = document.getElementById(id); if(el) { let val = el.value; el.innerHTML = '<option value="" disabled selected>Materia...</option>' + mHtml; if(materieVisibili.includes(val)) el.value = val; } }); caricaRegistroAttivita(); caricaRegistroCompiti(); }
+        function preparaModificaAttivita(idx) { let a = db.attivita[idx]; editIdxAtt = idx; document.getElementById('attivitaMateria').value = a.materia; document.getElementById('attivitaData').value = a.data; document.getElementById('attivitaTesto').value = a.testo; document.querySelector('#page-attivita .btn').innerText = "Aggiorna"; }
+        function salvaAttivita() { let m=document.getElementById('attivitaMateria').value, t = document.getElementById('attivitaTesto').value.trim(); if(!t||!m) return; if(editIdxAtt >= 0) { db.attivita[editIdxAtt] = { materia:m, data:document.getElementById('attivitaData').value, testo:t }; editIdxAtt = -1; document.querySelector('#page-attivita .btn').innerText = "Registra"; } else { db.attivita.push({ materia:m, data:document.getElementById('attivitaData').value, testo:t }); } salvaDB(); document.getElementById('attivitaTesto').value=''; caricaRegistroAttivita(); }
+        function caricaRegistroAttivita() { let m = document.getElementById('filtroAttivita').value, tb = document.getElementById('tabellaStoricoAttivita'); tb.innerHTML=''; db.attivita.map((a,i)=>({...a, idx:i})).filter(a=>a.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(a => tb.innerHTML += `<tr><td>${a.data.split('-').reverse().join('/')}</td><td>${a.testo}</td><td><button class="btn-cestino" onclick="preparaModificaAttivita(${a.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.attivita.splice(${a.idx},1); salvaDB(); caricaRegistroAttivita();}">🗑️</button></td></tr>`); }
+        function preparaModificaCompito(idx) { let c = db.compiti[idx]; editIdxComp = idx; document.getElementById('compitiMateria').value = c.materia; document.getElementById('compitiData').value = c.data; document.getElementById('compitiTesto').value = c.testo; document.querySelector('#page-compiti .btn').innerText = "Aggiorna"; }
+        function salvaCompiti() { let m=document.getElementById('compitiMateria').value, t = document.getElementById('compitiTesto').value.trim(); if(!t||!m) return; if(editIdxComp >= 0) { db.compiti[editIdxComp] = { materia:m, data:document.getElementById('compitiData').value, testo:t }; editIdxComp = -1; document.querySelector('#page-compiti .btn').innerText = "Assegna"; } else { db.compiti.push({ materia:m, data:document.getElementById('compitiData').value, testo:t }); } salvaDB(); document.getElementById('compitiTesto').value=''; caricaRegistroCompiti(); }
+        function caricaRegistroCompiti() { let m = document.getElementById('filtroCompiti').value, tb = document.getElementById('tabellaStoricoCompiti'); tb.innerHTML=''; db.compiti.map((c,i)=>({...c, idx:i})).filter(c=>c.materia===m).sort((a,b)=>new Date(b.data)-new Date(a.data)).forEach(c => tb.innerHTML += `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.testo}</td><td><button class="btn-cestino" onclick="preparaModificaCompito(${c.idx})">✏️</button> <button class="btn-cestino" onclick="if(confirm('Eliminare?')){db.compiti.splice(${c.idx},1); salvaDB(); caricaRegistroCompiti();}">🗑️</button></td></tr>`); }
+
+        function inizializzaBozzaPagella() { let studentiClasse = db.studentiPerClasse[classeCorrente] || []; if(!bozzaPagella.voti) bozzaPagella.voti={}; if(!bozzaPagella.ammessi) bozzaPagella.ammessi={}; studentiClasse.forEach(s=>{ if(bozzaPagella.ammessi[s]===undefined) bozzaPagella.ammessi[s]=true; }); document.getElementById('pagellaTitolo').value = bozzaPagella.titolo; }
+        function resetBozzaPagella() { if(confirm("Vuoi azzerare la bozza attuale?")) { bozzaPagella = {titolo:'', voti:{}, ammessi:{}}; document.getElementById('pagellaTitolo').value=''; caricaGrigliaMateriePagella(); } }
+        function caricaGrigliaMateriePagella() { let materieVisibili = utenteLoggato?.isAdmin ? db.materie : utenteLoggato?.materie || []; inizializzaBozzaPagella(); let grid = document.getElementById('grigliaMateriePagella'); grid.innerHTML = ''; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; materieVisibili.forEach(m => { let comp = true; if(!bozzaPagella.voti[m]) comp=false; else { studentiClasse.forEach(s=>{ if(!bozzaPagella.voti[m][s]||bozzaPagella.voti[m][s].trim()==="") comp=false; }); } let st = comp?"border: 2px solid var(--voto-suff); box-shadow: 0 0 10px rgba(74, 222, 128, 0.2); background: #15241b;":""; let txt = comp?'✅ Completata':'⏳ Da compilare'; grid.innerHTML += `<div class="card-materia" style="${st}" onclick="apriCompilaMateriaPagella('${m}')">${m}<br><span style="font-size:12px; font-weight:normal; color:var(--text-muted); display:inline-block; margin-top:5px;">${txt}</span></div>`; }); }
+        function apriCompilaMateriaPagella(m) { materiaPagellaCorrente = m; document.getElementById('titoloCompilaMateriaPagella').innerText = "Pagella: " + m; let tb = document.getElementById('corpoCompilaMateriaPagella'); tb.innerHTML = ''; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; if(!bozzaPagella.voti[m]) bozzaPagella.voti[m] = {}; studentiClasse.forEach(s => { let vv = db.voti.filter(v => v.materia===m && v.studente===s && v.faMedia!==false && !isNaN(parseFloat(v.voto))); let med = vv.length?(vv.reduce((acc,c)=>acc+parseFloat(c.voto),0)/vv.length).toFixed(2):'-'; let v = bozzaPagella.voti[m][s] || ''; tb.innerHTML += `<tr><td><b style="font-size:15px;">${s}</b></td><td style="color:var(--accent-cyan); font-weight:bold; font-size:16px;">${med}</td><td><input type="number" id="pagella_draft_voto_${s}" min="1" max="10" step="0.5" value="${v}" placeholder="Voto" style="max-width:120px; margin:0; font-weight:bold;" oninput="if(this.value > 10) this.value = 10;"></td></tr>`; }); cambiaPagina('compila-materia-pagella'); }
+        function importaVotiMediaMateria() { let m = materiaPagellaCorrente; let modificati = 0; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; studentiClasse.forEach(s => { let vv = db.voti.filter(v => v.materia === m && v.studente === s && v.faMedia !== false && !isNaN(parseFloat(v.voto))); if (vv.length > 0) { let media = (vv.reduce((acc, c) => acc + parseFloat(c.voto), 0) / vv.length).toFixed(1); let mediaArrotondata = Math.round(media * 2) / 2; let input = document.getElementById(`pagella_draft_voto_${s}`); if (input) { input.value = mediaArrotondata; modificati++; } } }); if (modificati > 0) alert(`Importati ${modificati} voti calcolati dalla media!`); else alert("Nessun voto calcolabile in questa materia."); }
+        function salvaMateriaPagella() { let m = materiaPagellaCorrente; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; if(!bozzaPagella.voti[m]) bozzaPagella.voti[m]={}; studentiClasse.forEach(s=>{ let val=document.getElementById(`pagella_draft_voto_${s}`).value; if(val) bozzaPagella.voti[m][s]=val; else delete bozzaPagella.voti[m][s]; }); cambiaPagina('crea-pagella'); }
+        function apriRiepilogoPagella() { bozzaPagella.titolo = document.getElementById('pagellaTitolo').value.trim(); if(!bozzaPagella.titolo) return alert("Inserisci un nome per la pagella prima di procedere!"); let list = document.getElementById('listaAmmissioniPagella'); list.innerHTML = ''; let studentiClasse = db.studentiPerClasse[classeCorrente] || []; studentiClasse.forEach(s => { let ck = bozzaPagella.ammessi[s]!==false; let col = ck?'var(--text-light)':'var(--voto-insuff)'; list.innerHTML += `<label class="checkbox-item" style="padding:12px; border:1px solid var(--border-color); border-radius:8px; background:#1c1c1f;"><input type="checkbox" id="ammesso_draft_${s}" ${ck?'checked':''} onchange="this.nextElementSibling.style.color=this.checked?'var(--text-light)':'var(--voto-insuff)'"><b style="font-size:15px; color:${col}; transition:0.2s;">${s}</b></label>`; }); cambiaPagina('riepilogo-pagella'); }
+        function pubblicaPagellaDefinitiva() { let studentiClasse = db.studentiPerClasse[classeCorrente] || []; studentiClasse.forEach(s=>bozzaPagella.ammessi[s]=document.getElementById(`ammesso_draft_${s}`).checked); if(confirm("Pubblicare definitivamente la pagella?")) { db.pagelle.push({ titolo:bozzaPagella.titolo, data:oggiStr, voti:bozzaPagella.voti, ammessi:bozzaPagella.ammessi, classe: classeCorrente }); salvaDB(); alert("Pagella Pubblicata!"); bozzaPagella={titolo:'', voti:{}, ammessi:{}}; document.getElementById('pagellaTitolo').value=''; cambiaPagina('pagelle', document.getElementById('btn-pagelle')); } }
+        function caricaArchivioPagelle() { let list = document.getElementById('listaPagelleSalvate'); list.innerHTML = ''; let filtrate = db.pagelle.filter(p => !p.classe || p.classe === classeCorrente); if(filtrate.length===0) return list.innerHTML='<p style="color:var(--text-muted)">Nessuna pagella per questa classe.</p>'; db.pagelle.forEach((p, i) => { if(p.classe && p.classe !== classeCorrente) return; let info = p.classe ? `Classe: ${p.classe} | ` : `Pagella | `; list.innerHTML += `<div style="background:#18181b; padding:15px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;"><div><h4 style="color:var(--accent-purple); margin-bottom:5px; font-size:16px;">${p.titolo}</h4><span style="font-size:12px; color:var(--text-muted);">${info}Data: ${p.data.split('-').reverse().join('/')}</span></div><div><button class="btn btn-small" onclick="apriPagellaArchivio(${i})">Apri</button><button class="btn-cestino" style="color:#ef4444;" onclick="seEliminaPagella(${i})">🗑️</button></div></div>`; }); }
+        function seEliminaPagella(idx) { if(confirm("Eliminare definitivamente?")) { db.pagelle.splice(idx,1); salvaDB(); caricaArchivioPagelle(); } }
+        function apriPagellaArchivio(idx) { window.pagellaCorrenteIdx = idx; let p = db.pagelle[idx]; document.getElementById('titoloPagellaAperta').innerText = p.titolo; document.getElementById('rinominaPagella').value = p.titolo; let divCorpo = document.getElementById('corpoTabellaPagellaAperta'); divCorpo.innerHTML = ''; let studentiPagella = p.ammessi ? Object.keys(p.ammessi) : (p.voti && Object.keys(p.voti).length ? Object.keys(p.voti[Object.keys(p.voti)[0]]) : []); studentiPagella.sort().forEach(s => { let amm = true; if(p.ammessi && p.ammessi[s]===false) amm=false; let col = amm?'var(--text-light)':'var(--voto-insuff)', lab = amm?'<span style="color:var(--voto-suff); font-size:12px; font-weight:normal;">(Ammesso)</span>':'<span style="color:var(--voto-insuff); font-size:12px; font-weight:bold;">(NON AMMESSO)</span>'; divCorpo.innerHTML += `<div class="card-studente-archivio" onclick="apriVotiStudentePagella(${idx}, '${s}')"><b style="color:${col}; font-size: 16px;">${s} ${lab}</b><span style="color:var(--accent-cyan); font-weight:bold; font-size:14px;">Voti ➡️</span></div>`; }); document.querySelectorAll('.page').forEach(el=>el.classList.remove('active')); document.getElementById('page-dettaglio-pagella').classList.add('active'); paginaAttiva='dettaglio-pagella'; }
+        function aggiornaNomePagella() { let nuovo = document.getElementById('rinominaPagella').value.trim(); if(nuovo) { db.pagelle[window.pagellaCorrenteIdx].titolo=nuovo; salvaDB(); document.getElementById('titoloPagellaAperta').innerText=nuovo; alert("Rinominata!"); } }
+        function apriVotiStudentePagella(idx, stud) { let p = db.pagelle[idx]; document.getElementById('titoloVotiStudentePagella').innerText = `Voti Finali: ${stud} (${p.titolo})`; let tb = document.getElementById('corpoVotiStudentePagella'); tb.innerHTML = ''; if(p.voti) { let mat = Object.keys(p.voti); if(mat.length===0) tb.innerHTML = `<tr><td colspan="2" style="text-align:center;">Nessun voto</td></tr>`; mat.forEach(m=>{ let v=p.voti[m][stud]||'-'; tb.innerHTML+=`<tr><td style="font-size:15px;"><b>${m}</b></td><td><b class="${v!=='-'?calcolaColore(v):''}" style="font-size:16px;">${v}</b></td></tr>`; }); } cambiaPagina('voti-studente-pagella'); }
+    </script>
+</body>
+</html>
